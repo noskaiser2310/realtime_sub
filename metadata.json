@@ -1,0 +1,9 @@
+{
+  "name": "Real-time Meeting Assistant (v6)",
+  "description": "A React application to record, transcribe, translate, and summarize Google Meet sessions or other tab audio in real-time using the Gemini API.",
+  "requestFramePermissions": [
+    "display-capture",
+    "microphone"
+  ],
+  "prompt": ""
+}

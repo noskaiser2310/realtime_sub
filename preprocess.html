@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Audio Recorder – Mic + Tab (Segments + Full File)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    :root{--bg:#f5f7fb;--card:#fff;--border:#ccd0d5;--radius:8px}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);padding:2rem;line-height:1.5}
+    h1{margin-top:0}
+    button{padding:.6rem 1.25rem;border:none;border-radius:6px;cursor:pointer;font-size:1rem;margin-right:.5rem}
+    button:disabled{opacity:.55;cursor:not-allowed}
+    #segments li{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);margin:.75rem 0;padding:1rem}
+    a.download{display:inline-block;margin-top:.4rem;text-decoration:none;color:#0d6efd;font-weight:500}
+    #downloadArea{margin-top:1.5rem;padding:1rem;background:var(--card);border:1px dashed #9ca3af;border-radius:var(--radius)}
+  </style>
+</head>
+<body>
+  <h1>Audio Recorder – Mic + Tab</h1>
+
+  <button id="startBtn">Bắt đầu ghi</button>
+  <button id="stopBtn" disabled>Dừng ghi</button>
+
+  <h2>Đoạn cắt (10 s):</h2>
+  <ul id="segments"></ul>
+
+  <h2>Toàn bộ phiên ghi:</h2>
+  <div id="downloadArea"><em>Chưa có dữ liệu…</em></div>
+
+  <h2>Trạng thái:</h2>
+  <div id="status"></div>
+
+<script>
+/********************** CONSTS *************************/
+const SEGMENT_MS = 10000;
+const segments   = document.getElementById('segments');
+const downloadArea = document.getElementById('downloadArea');
+const statusBox  = document.getElementById('status');
+const startBtn   = document.getElementById('startBtn');
+const stopBtn    = document.getElementById('stopBtn');
+
+/********************** STATE *************************/
+let isRecording   = false;
+let mediaStream   = null;
+let currentIdx    = 1;
+let decodedBuffers= [];
+let mimeType      = '';
+
+/********************** UTILS *************************/
+function log(msg, cls=''){
+  const p=document.createElement('p');
+  p.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;
+  if(cls) p.className=cls;
+  statusBox.prepend(p);
+}
+function audioBufferToWav(buffer){
+  const numCh = buffer.numberOfChannels;
+  const len   = buffer.length * numCh * 2;
+  const wav   = new DataView(new ArrayBuffer(44 + len));
+  const writeString = (o,s)=>{for(let i=0;i<s.length;i++)wav.setUint8(o+i,s.charCodeAt(i));};
+  writeString(0,'RIFF');
+  wav.setUint32(4,36+len,true);
+  writeString(8,'WAVE');
+  writeString(12,'fmt ');
+  wav.setUint32(16,16,true);wav.setUint16(20,1,true);
+  wav.setUint16(22,numCh,true);
+  wav.setUint32(24,buffer.sampleRate,true);
+  wav.setUint32(28,buffer.sampleRate*numCh*2,true);
+  wav.setUint16(32,numCh*2,true);wav.setUint16(34,16,true);
+  writeString(36,'data');wav.setUint32(40,len,true);
+  let offset=44;
+  for(let i=0;i<buffer.length;i++){
+    for(let ch=0;ch<numCh;ch++){
+      let s = buffer.getChannelData(ch)[i];
+      s=Math.max(-1,Math.min(1,s));
+      wav.setInt16(offset, s<0?s*0x8000:s*0x7FFF, true);
+      offset+=2;
+    }
+  }
+  return new Blob([wav],{type:'audio/wav'});
+}
+
+/********************** STREAM MIXER *************************/
+async function getMixedStream(){
+  const mic = await navigator.mediaDevices.getUserMedia({audio:true});
+  let sys;
+  try{
+    sys = await navigator.mediaDevices.getDisplayMedia({video:{frameRate:1,displaySurface:'browser'},audio:true});
+  }catch(e){
+    log('Tab audio bị từ chối – chuyển sang Screen audio','warn');
+    sys = await navigator.mediaDevices.getDisplayMedia({video:true,audio:true});
+  }
+  const ctx   = new (window.AudioContext||window.webkitAudioContext)();
+  const dest  = ctx.createMediaStreamDestination();
+  [mic,sys].forEach(st=>ctx.createMediaStreamSource(st).connect(dest));
+  mimeType = getSupportedMime();
+  log(`mimeType sử dụng: ${mimeType}`);
+  return {stream:dest.stream, tracks:[...mic.getTracks(),...sys.getTracks()], ctx};
+}
+function getSupportedMime(){
+  const types=[
+    'audio/ogg;codecs=opus',
+    'audio/webm;codecs=opus',
+    'audio/webm'
+  ];
+  return types.find(t=>MediaRecorder.isTypeSupported(t))||'';
+}
+
+/********************** RECORD LOGIC *************************/
+let rec;let mixer;
+async function recordSegment(){
+  if(!isRecording) return;
+  rec = new MediaRecorder(mixer.stream,{mimeType});
+
+  rec.ondataavailable = e=>{
+    if(e.data.size){
+      decodeBlob(e.data,currentIdx++);
+    }
+  };
+  rec.start();
+  setTimeout(()=>rec.state==='recording'&&rec.stop(), SEGMENT_MS);
+}
+function decodeBlob(blob,idx){
+  blob.arrayBuffer().then(buf=>mixer.ctx.decodeAudioData(buf)).then(audioBuf=>{
+    decodedBuffers.push(audioBuf);
+    const wav=audioBufferToWav(audioBuf);
+    const li=document.createElement('li');
+    const audio=document.createElement('audio');audio.controls=true;audio.src=URL.createObjectURL(wav);
+    const link=document.createElement('a');link.className='download';link.href=audio.src;link.download=`segment_${idx}.wav`;link.textContent='⬇️ Tải đoạn';
+    li.textContent=`Đoạn ${idx}`;li.appendChild(audio);li.appendChild(link);
+    segments.appendChild(li);
+    log(`✅ Đã xong đoạn ${idx}`,'success');
+    if(isRecording) recordSegment();
+  }).catch(err=>{
+    log(`❌ Lỗi giải mã đoạn ${idx}: ${err.message}`,'error');
+  });
+}
+function mergeBuffers(){
+  const len = decodedBuffers.reduce((t,b)=>t+b.length,0);
+  const ctx = new OfflineAudioContext(1,len,44100);
+  let offset=0;
+  decodedBuffers.forEach(b=>{
+    const ch = ctx.createBufferSource();
+    const mono = ctx.createBuffer(1,b.length,b.sampleRate);
+    mono.copyToChannel(b.getChannelData(0),0);
+    if(b.numberOfChannels>1) mono.copyToChannel(b.getChannelData(1),0);
+    ch.buffer=mono;ch.connect(ctx.destination);ch.start(offset/44100);
+    offset+=b.length;
+  });
+  return ctx.startRendering();
+}
+
+/********************** UI EVENTS *************************/
+startBtn.onclick = async ()=>{
+  if(isRecording) return;
+  try{
+    mixer = await getMixedStream();
+    isRecording = true;startBtn.disabled=true;stopBtn.disabled=false;decodedBuffers=[];currentIdx=1;segments.innerHTML='';downloadArea.innerHTML='<em>Đang ghi…</em>';
+    log('🎙️ Bắt đầu ghi – 10 s/đoạn');
+    recordSegment();
+  }catch(err){log(`Không thể khởi tạo ghi: ${err.message}`,'error');}
+};
+stopBtn.onclick = ()=>{
+  isRecording=false;startBtn.disabled=false;stopBtn.disabled=true;
+  if(rec&&rec.state==='recording') rec.stop();
+  mixer.tracks.forEach(t=>t.stop());mixer.ctx.close();
+  mergeBuffers().then(fullBuf=>{
+    const fullWav=audioBufferToWav(fullBuf);
+    const link=document.createElement('a');link.className='download';
+    link.href=URL.createObjectURL(fullWav);
+    link.download=`Recording_${Date.now()}.wav`;
+    link.textContent='⬇️ Tải toàn bộ phiên ghi (WAV)';
+    downloadArea.innerHTML='';
+    downloadArea.appendChild(link);
+    log('📥 Sẵn sàng tải toàn bộ');
+  });
+};
+</script>
+</body>
+</html>

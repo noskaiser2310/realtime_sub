@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Real-time Meeting Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.1.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
+    "react/": "https://esm.sh/react@^19.1.0/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.2.0",
+    "bcryptjs": "https://esm.sh/bcryptjs@^2.4.3",
+    "@/App": "./App.tsx"
+  }
+}
+</script>
+<style>
+  .fullscreen-loader {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background-color: #1a202c; /* bg-slate-800 */
+    color: #e2e8f0; /* text-slate-200 */
+  }
+  .fullscreen-loader p {
+    margin-top: 1rem;
+    font-size: 1.125rem; /* text-lg */
+  }
+  /* Basic Toast Styling */
+  .toast-container {
+    position: fixed;
+    top: 1.25rem; /* top-5 */
+    right: 1.25rem; /* right-5 */
+    z-index: 50;
+  }
+  .toast {
+    padding: 0.75rem 1rem; /* py-3 px-4 */
+    border-radius: 0.5rem; /* rounded-lg */
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-lg */
+    margin-bottom: 0.5rem;
+    color: white;
+    opacity: 0;
+    transform: translateX(100%);
+    animation: toast-slide-in 0.5s forwards, toast-fade-out 0.5s 2.5s forwards;
+  }
+  .toast.success { background-color: #48bb78; /* bg-green-500 */ }
+  .toast.error { background-color: #f56565; /* bg-red-500 */ }
+  .toast.info { background-color: #4299e1; /* bg-blue-500 */ }
+
+  @keyframes toast-slide-in {
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  @keyframes toast-fade-out {
+    from {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateX(100%);
+    }
+  }
+</style>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-slate-900">
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trình Tạo Giọng Nói Từ Văn Bản (Realtime - Chỉ đọc phần mới)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #2c3e50, #3498db, #1abc9c); 
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; 
+            overflow-y: auto; 
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            padding-bottom: 40px; 
+        }
+
+        header {
+            text-align: center;
+            padding: 25px 20px; 
+            background: rgba(255, 255, 255, 0.1); 
+            backdrop-filter: blur(12px);
+            border-radius: 20px; 
+            box-shadow: 0 6px 25px rgba(0, 0, 0, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        h1 {
+            font-size: 2.6rem; 
+            margin-bottom: 12px;
+            color: white;
+            text-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
+        }
+
+        .subtitle {
+            font-size: 1.15rem; 
+            color: #e0e0e0;
+            max-width: 750px;
+            margin: 0 auto;
+            line-height: 1.65;
+        }
+        #user-id-display {
+            font-size: 0.85rem;
+            color: #d0d0d0;
+            margin-top: 12px;
+            background-color: rgba(0,0,0,0.25);
+            padding: 6px 12px;
+            border-radius: 10px;
+            display: inline-block;
+        }
+         #error-display {
+            background-color: #ffdddd;
+            color: #d8000c;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px auto;
+            text-align: center;
+            border: 1px solid #d8000c;
+            max-width: 750px;
+            display: none; /* Hidden by default */
+        }
+
+        .app-container {
+            display: flex;
+            gap: 25px;
+            flex-wrap: wrap;
+        }
+
+        .input-section, .history-section {
+            flex: 1;
+            min-width: 360px; 
+            background: rgba(255, 255, 255, 0.98); 
+            border-radius: 20px;
+            padding: 30px; 
+            box-shadow: 0 10px 35px rgba(0, 0, 0, 0.15);
+            display: flex;
+            flex-direction: column;
+            gap: 22px; 
+        }
+
+        .section-title {
+            font-size: 1.7rem; 
+            color: #1a2a6c; 
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #3498db;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .section-title i {
+            color: #3498db;
+        }
+
+        .form-group {
+            margin-bottom: 22px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 500;
+            color: #2c3e50;
+            font-size: 1.05rem; 
+        }
+
+        textarea {
+            width: 100%;
+            height: 180px;
+            padding: 16px; 
+            border: 1px solid #ced4da; 
+            border-radius: 12px; 
+            font-size: 1.05rem;
+            resize: vertical;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        textarea:focus {
+            border-color: #3498db;
+            box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.15);
+            outline: none;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 22px;
+            margin: 18px 0;
+        }
+
+        .control-group {
+            flex: 1;
+            min-width: 220px;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+        }
+
+        .slider-container input[type="range"] {
+            flex: 1;
+            height: 10px; 
+            border-radius: 5px;
+            background: #dee2e6;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slider-container input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px; 
+            height: 24px;
+            border-radius: 50%;
+            background: #3498db;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+            transition: background-color 0.2s ease;
+        }
+        .slider-container input[type="range"]::-webkit-slider-thumb:hover {
+            background: #2980b9;
+        }
+
+         .slider-container input[type="range"]::-moz-range-thumb { 
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #3498db;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+            transition: background-color 0.2s ease;
+        }
+        .slider-container input[type="range"]::-moz-range-thumb:hover {
+            background: #2980b9;
+        }
+
+        .slider-value {
+            min-width: 45px;
+            text-align: center;
+            font-weight: 500;
+            color: #2c3e50;
+            background-color: #e9ecef; 
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+
+        .audio-controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 28px; 
+            border: none;
+            border-radius: 25px; 
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px; 
+            letter-spacing: 0.5px; 
+        }
+        .btn:not(.btn-disabled):active {
+            transform: translateY(1px) scale(0.97);
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.35);
+        }
+        .btn-primary:hover:not(.btn-disabled) {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(52, 152, 219, 0.45);
+        }
+
+        .btn-secondary {
+            background: #e74c3c;
+            color: white;
+            box-shadow: 0 4px 12px rgba(231, 76, 60, 0.35);
+        }
+        .btn-secondary:hover:not(.btn-disabled) {
+            background: #c0392b;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(231, 76, 60, 0.45);
+        }
+
+        .btn-neutral { 
+            background: #95a5a6; 
+            color: white;
+            box-shadow: 0 4px 10px rgba(149, 165, 166, 0.3);
+        }
+        .btn-neutral:hover:not(.btn-disabled) {
+            background: #7f8c8d;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(149, 165, 166, 0.4);
+        }
+
+        .btn-disabled {
+            background: #bdc3c7 !important; 
+            color: #ecf0f1 !important;
+            cursor: not-allowed !important;
+            box-shadow: none !important;
+            transform: none !important;
+        }
+
+        .status {
+            padding: 16px;
+            border-radius: 12px;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            margin-top: 18px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .status i {
+            font-size: 1.6rem;
+        }
+
+        .history-list {
+            list-style: none;
+            max-height: 380px; 
+            overflow-y: auto;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            border: 1px solid #e9ecef;
+        }
+
+        .history-item {
+            padding: 16px;
+            border-bottom: 1px solid #e9ecef; 
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.2s;
+            border-radius: 10px; 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px; 
+        }
+         .history-item:last-child {
+            border-bottom: none;
+        }
+        .history-item:hover {
+            background-color: #e3f2fd;
+            transform: translateX(3px); 
+        }
+
+        .history-text {
+            flex: 1;
+            font-size: 0.95rem; 
+            color: #34495e; 
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2; 
+            -webkit-box-orient: vertical;
+            max-height: 3em; 
+        }
+
+        .history-date {
+            font-size: 0.8rem; 
+            color: #7f8c8d;
+            min-width: 130px; 
+            text-align: right;
+            white-space: nowrap; 
+        }
+
+        .history-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 18px;
+        }
+        .history-actions .btn {
+            padding: 10px 18px;
+            font-size: 0.9rem;
+        }
+
+        .audio-player-container { 
+            width: 100%;
+            margin-top: 18px;
+            border-radius: 12px;
+            background: #f8f9fa;
+            padding: 18px;
+            border: 1px solid #e9ecef;
+        }
+        .audio-player-container audio {
+            width: 100%; 
+        }
+
+        .info-box {
+            background: #e0f7fa; 
+            border-left: 5px solid #00acc1; 
+            padding: 18px;
+            border-radius: 0 10px 10px 0;
+            margin-top: 18px;
+            font-size: 0.9rem;
+        }
+        .info-box h3 {
+            color: #007c91; 
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .info-box ul {
+            padding-left: 22px;
+            color: #37474f; 
+        }
+        .info-box li {
+            margin-bottom: 6px;
+        }
+
+        footer {
+            text-align: center;
+            padding: 25px 20px;
+            color: #e0e0e0;
+            font-size: 0.95rem;
+            margin-top: 15px;
+            opacity: 0.85;
+        }
+
+        @media (max-width: 768px) {
+            .app-container { flex-direction: column; }
+            h1 { font-size: 2.1rem; }
+            .subtitle { font-size: 1rem; }
+            .controls { flex-direction: column; }
+            .control-group { min-width: 100%; }
+            .input-section, .history-section { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-microphone-alt"></i> Trình Tạo Giọng Nói Từ Văn Bản</h1>
+            <p class="subtitle">Nhập văn bản, ứng dụng sẽ tự động đọc phần mới. Điều chỉnh tốc độ, cao độ và xem lịch sử (cập nhật thời gian thực).</p>
+            <div id="error-display"></div>
+            <p id="user-id-display">Đang kết nối...</p>
+        </header>
+        
+        <div class="app-container">
+            <section class="input-section">
+                <h2 class="section-title"><i class="fas fa-keyboard"></i> Nhập liệu & Điều chỉnh</h2>
+                
+                <div class="form-group">
+                    <label for="tts-input">Văn bản cần chuyển thành giọng nói (tự động đọc phần mới):</label>
+                    <textarea id="tts-input" placeholder="Nhập văn bản tại đây... Ví dụ: Xin chào các bạn. Chúc một ngày tốt lành!"></textarea>
+                </div>
+                
+                <div class="controls">
+                    <div class="control-group">
+                        <label for="rate-control">Tốc độ đọc:</label>
+                        <div class="slider-container">
+                            <input type="range" id="rate-control" min="0.5" max="2" step="0.1" value="1">
+                            <span class="slider-value" id="rate-value">1.0x</span>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="pitch-control">Cao độ giọng:</label>
+                        <div class="slider-container">
+                            <input type="range" id="pitch-control" min="0.1" max="2" step="0.1" value="1">
+                            <span class="slider-value" id="pitch-value">1.0</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="audio-controls">
+                    <button id="speak-btn" class="btn btn-primary">
+                        <i class="fas fa-play-circle"></i> Đọc toàn bộ
+                    </button>
+                    <button id="pause-btn" class="btn btn-secondary btn-disabled" disabled>
+                        <i class="fas fa-pause-circle"></i> Tạm dừng
+                    </button>
+                     <button id="resume-btn" class="btn btn-secondary btn-disabled" disabled>
+                        <i class="fas fa-play"></i> Tiếp tục
+                    </button>
+                    <button id="clear-btn" class="btn btn-neutral">
+                        <i class="fas fa-trash-alt"></i> Xóa văn bản
+                    </button>
+                </div>
+                
+                <div class="status">
+                    <i class="fas fa-info-circle"></i>
+                    <div>
+                        <strong>Trạng thái:</strong>
+                        <span id="status-text">Sẵn sàng nhập văn bản</span>
+                    </div>
+                </div>
+                
+                <div class="audio-player-container">
+                    <label for="audio-player-element">Trình phát âm thanh (dự phòng):</label>
+                    <audio id="audio-player-element" controls></audio>
+                </div>
+            </section>
+            
+            <section class="history-section">
+                <h2 class="section-title"><i class="fas fa-history"></i> Lịch sử đọc (Realtime)</h2>
+                
+                <ul class="history-list" id="history-list">
+                    {/* Lịch sử sẽ được cập nhật ở đây */}
+                </ul>
+                
+                <div class="history-actions">
+                    <button id="clear-history-btn" class="btn btn-neutral">
+                        <i class="fas fa-broom"></i> Xóa lịch sử
+                    </button>
+                </div>
+                
+                <div class="info-box">
+                    <h3><i class="fas fa-lightbulb"></i> Mẹo sử dụng</h3>
+                    <ul>
+                        <li>Văn bản mới nhập sẽ được đọc tự động sau khi bạn dừng gõ.</li>
+                        <li>Sử dụng nút "Đọc toàn bộ" để phát lại toàn bộ nội dung hoặc đồng bộ lại.</li>
+                        <li>Lịch sử được lưu trữ trên Cloud và cập nhật tự động.</li>
+                    </ul>
+                </div>
+            </section>
+        </div>
+        
+        <footer>
+            <p>Ứng dụng Trình Tạo Giọng Nói Realtime | Phát triển với TTS API & Cloud Firestore</p>
+        </footer>
+    </div>
+    
+    <script type="module">
+        // Firebase SDKs
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, query, onSnapshot, orderBy, serverTimestamp, deleteDoc, getDocs, limit as firestoreLimit, doc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // DOM Elements
+        const ttsInput = document.getElementById('tts-input');
+        const speakBtn = document.getElementById('speak-btn');
+        const pauseBtn = document.getElementById('pause-btn');
+        const resumeBtn = document.getElementById('resume-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const clearHistoryBtn = document.getElementById('clear-history-btn');
+        const rateControl = document.getElementById('rate-control');
+        const pitchControl = document.getElementById('pitch-control');
+        const rateValue = document.getElementById('rate-value');
+        const pitchValue = document.getElementById('pitch-value');
+        const statusText = document.getElementById('status-text');
+        const historyList = document.getElementById('history-list');
+        const userIdDisplay = document.getElementById('user-id-display');
+        const errorDisplay = document.getElementById('error-display');
+
+        // Firebase Configuration & Initialization
+        let rawFirebaseConfig = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
+        let firebaseConfig;
+        try {
+            firebaseConfig = JSON.parse(rawFirebaseConfig);
+        } catch (e) {
+            console.error("Invalid __firebase_config JSON:", e);
+            firebaseConfig = {}; 
+        }
+        
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-tts-app-realtime-incremental'; 
+        
+        let app;
+        let auth;
+        let db;
+        let currentUserId = null; 
+        let historyCollectionRef;
+
+        // State variables for speech and text tracking
+        let isSpeaking = false; 
+        let isPaused = false; 
+        let currentUtterance = null; 
+        let debounceTimer = null;
+        const DEBOUNCE_DELAY = 1200; 
+        let lastSpokenIndex = 0; // Index in the ttsInput.value up to which text has been spoken
+        let utteranceWasCancelled = false; // Flag to manage cancellation behavior
+
+        function displayGlobalError(message) {
+            if (errorDisplay) {
+                errorDisplay.textContent = message;
+                errorDisplay.style.display = 'block';
+            }
+            console.error("Global Error:", message);
+            if (userIdDisplay) userIdDisplay.textContent = "Lỗi!";
+            // Disable app controls
+            if(speakBtn) speakBtn.disabled = true;
+            if(clearHistoryBtn) clearHistoryBtn.disabled = true;
+        }
+
+        if (!firebaseConfig || !firebaseConfig.apiKey || !firebaseConfig.projectId) {
+            displayGlobalError("Lỗi cấu hình Firebase: Cấu hình không hợp lệ hoặc bị thiếu. Vui lòng kiểm tra biến __firebase_config.");
+        } else {
+            try {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                // setLogLevel('debug'); // Uncomment for verbose Firestore logging
+
+                historyCollectionRef = collection(db, `artifacts/${appId}/public/data/ttsHistory`);
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        currentUserId = user.uid;
+                        if(userIdDisplay) userIdDisplay.textContent = `User ID: ${currentUserId}`;
+                        console.log("Firebase: User signed in with UID:", currentUserId);
+                        loadHistoryFromFirestore(); 
+                    } else {
+                        if(userIdDisplay) userIdDisplay.textContent = "Đang xác thực...";
+                        console.log("Firebase: User is signed out. Attempting to sign in...");
+                        try {
+                            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                                console.log("Firebase: Attempting signInWithCustomToken.");
+                                await signInWithCustomToken(auth, __initial_auth_token);
+                            } else {
+                                console.log("Firebase: Attempting signInAnonymously.");
+                                await signInAnonymously(auth);
+                            }
+                            console.log("Firebase: Sign-in attempt successful (or already signed in).");
+                        } catch (error) {
+                            console.error("Firebase: Error during sign-in:", error);
+                            const authErrorMsg = `Lỗi xác thực Firebase: ${error.message}. Hãy đảm bảo phương thức đăng nhập (ẩn danh hoặc custom token) được kích hoạt trong Firebase Console và cấu hình là chính xác.`;
+                            displayGlobalError(authErrorMsg);
+                            updateStatus(authErrorMsg, 'error');
+                        }
+                    }
+                });
+
+            } catch (error) {
+                console.error("Firebase: Initialization error:", error);
+                const initErrorMsg = `Lỗi khởi tạo Firebase: ${error.message}. Kiểm tra cấu hình Firebase.`;
+                displayGlobalError(initErrorMsg);
+                updateStatus(initErrorMsg, 'error');
+            }
+        }
+        
+        // Initialize UI & Event Listeners
+        if (rateControl) updateSliderValues(); 
+        
+        if (rateControl) rateControl.addEventListener('input', updateSliderValues);
+        if (pitchControl) pitchControl.addEventListener('input', updateSliderValues);
+        
+        if (speakBtn) speakBtn.addEventListener('click', function() {
+            if (!app) { displayGlobalError("Firebase chưa được khởi tạo."); return; }
+            const textToSpeak = ttsInput.value.trim();
+            if (textToSpeak !== '') {
+                clearTimeout(debounceTimer); 
+                lastSpokenIndex = 0; // Reset for full read
+                generateAndPlaySpeech(textToSpeak, true); // true: isFullRead
+            } else {
+                updateStatus('Vui lòng nhập văn bản trước khi phát', 'error');
+            }
+        });
+        
+        if (pauseBtn) pauseBtn.addEventListener('click', function() {
+            if (isSpeaking && !isPaused && window.speechSynthesis && window.speechSynthesis.speaking) {
+                window.speechSynthesis.pause();
+                isPaused = true;
+                updateStatus('Đã tạm dừng', 'info');
+                pauseBtn.classList.add('btn-disabled');
+                pauseBtn.disabled = true;
+                if (resumeBtn) { 
+                    resumeBtn.classList.remove('btn-disabled');
+                    resumeBtn.disabled = false;
+                }
+                if (speakBtn) speakBtn.disabled = true; 
+            }
+        });
+
+        if (resumeBtn) resumeBtn.addEventListener('click', function() {
+            if (isSpeaking && isPaused && window.speechSynthesis && window.speechSynthesis.paused) {
+                window.speechSynthesis.resume();
+                isPaused = false;
+                updateStatus('Đang tiếp tục phát...', 'playing');
+                resumeBtn.classList.add('btn-disabled');
+                resumeBtn.disabled = true;
+                if (pauseBtn) { 
+                    pauseBtn.classList.remove('btn-disabled');
+                    pauseBtn.disabled = false;
+                }
+                if (speakBtn) speakBtn.disabled = true; 
+            }
+        });
+        
+        if (clearBtn) clearBtn.addEventListener('click', function() {
+            if (ttsInput) ttsInput.value = '';
+            lastSpokenIndex = 0; // Reset spoken index
+            
+            if (window.speechSynthesis && (window.speechSynthesis.speaking || window.speechSynthesis.pending)) {
+                utteranceWasCancelled = true; // Set flag before cancelling
+                window.speechSynthesis.cancel(); 
+                // resetSpeechControls will be called by onend/onerror of the cancelled utterance
+            } else {
+                resetSpeechControls(); // If nothing was speaking/pending, reset directly
+            }
+            updateStatus('Đã xóa văn bản. Sẵn sàng nhập mới.', 'info');
+        });
+        
+        if (clearHistoryBtn) clearHistoryBtn.addEventListener('click', async function() {
+            if (!db || !historyCollectionRef) {
+                updateStatus('Firestore chưa sẵn sàng.', 'error');
+                return;
+            }
+            updateStatus('Đang xóa lịch sử...', 'info');
+            try {
+                const querySnapshot = await getDocs(historyCollectionRef);
+                if (querySnapshot.empty) {
+                    updateStatus('Lịch sử đã trống.', 'info');
+                    return;
+                }
+                const batch = writeBatch(db);
+                querySnapshot.forEach(docSnap => { // Renamed doc to docSnap to avoid conflict
+                    batch.delete(docSnap.ref);
+                });
+                await batch.commit();
+                updateStatus('Đã xóa toàn bộ lịch sử', 'info');
+            } catch (error) {
+                console.error("Error clearing history: ", error);
+                updateStatus('Lỗi khi xóa lịch sử: ' + error.message, 'error');
+            }
+        });
+        
+        if (ttsInput) ttsInput.addEventListener('input', function() { 
+            if (!app) return; // Don't process input if Firebase isn't working
+            const fullCurrentText = ttsInput.value; // Do not trim here to maintain correct lastSpokenIndex
+            clearTimeout(debounceTimer);
+
+            if (fullCurrentText.trim() === "") {
+                if (window.speechSynthesis && (window.speechSynthesis.speaking || window.speechSynthesis.pending)) {
+                    utteranceWasCancelled = true;
+                    window.speechSynthesis.cancel();
+                } else {
+                    resetSpeechControls();
+                }
+                lastSpokenIndex = 0;
+                updateStatus('Nhập văn bản để bắt đầu', 'info');
+                return;
+            }
+            
+            updateStatus('Đang chờ bạn dừng gõ...', 'info'); 
+
+            debounceTimer = setTimeout(() => {
+                // Ensure lastSpokenIndex is valid relative to the current full text length
+                lastSpokenIndex = Math.min(lastSpokenIndex, fullCurrentText.length);
+                
+                const newTextSegmentToSpeak = fullCurrentText.substring(lastSpokenIndex).trim();
+
+                if (newTextSegmentToSpeak !== "") {
+                    console.log("Debounce: Attempting to speak new segment - ", newTextSegmentToSpeak);
+                    generateAndPlaySpeech(newTextSegmentToSpeak, false); // false: not a fullRead
+                } else {
+                    console.log("Debounce: No new text segment to speak or only whitespace.");
+                    if (!isSpeaking) updateStatus('Sẵn sàng nhập tiếp hoặc nhấn "Đọc toàn bộ"', 'ready');
+                    // If the remaining part is only whitespace, update lastSpokenIndex to current length
+                    if (fullCurrentText.substring(lastSpokenIndex).match(/^\s*$/)) {
+                        lastSpokenIndex = fullCurrentText.length;
+                    }
+                }
+            }, DEBOUNCE_DELAY);
+        });
+        
+        // Functions
+        function updateSliderValues() {
+            if (rateValue && rateControl) rateValue.textContent = parseFloat(rateControl.value).toFixed(1) + 'x';
+            if (pitchValue && pitchControl) pitchValue.textContent = parseFloat(pitchControl.value).toFixed(1);
+        }
+        
+        function updateStatus(message, type = 'default') {
+            if (!statusText) return; 
+            statusText.textContent = message;
+            const statusIconParent = statusText.parentElement;
+            const iconElement = statusIconParent ? statusIconParent.querySelector('i') : null;
+            
+            let color = '#2c3e50'; 
+            let iconClass = 'fas fa-info-circle';
+
+            switch(type) {
+                case 'ready': color = '#27ae60'; iconClass = 'fas fa-check-circle'; break;
+                case 'error': color = '#e74c3c'; iconClass = 'fas fa-exclamation-triangle'; break;
+                case 'playing': color = '#3498db'; iconClass = 'fas fa-volume-up'; break;
+                case 'info': color = '#f39c12'; iconClass = 'fas fa-info-circle'; break;
+                case 'loading': color = '#3498db'; iconClass = 'fas fa-spinner fa-spin'; break;
+            }
+            statusText.style.color = color;
+            if (iconElement) {
+                iconElement.className = iconClass; 
+                iconElement.style.color = color;
+            }
+        }
+
+        function resetSpeechControls() {
+            isSpeaking = false;
+            isPaused = false;
+            if (speakBtn) { speakBtn.disabled = !app; speakBtn.classList.remove('btn-disabled'); } // Only enable if app is valid
+            if (pauseBtn) { pauseBtn.disabled = true; pauseBtn.classList.add('btn-disabled'); }
+            if (resumeBtn) { resumeBtn.disabled = true; resumeBtn.classList.add('btn-disabled'); }
+            currentUtterance = null; // Clear the reference to the old utterance
+        }
+        
+        function generateAndPlaySpeech(textToSpeakSegment, isFullRead = false) {
+            if (!('speechSynthesis' in window) || !window.speechSynthesis) {
+                updateStatus('Trình duyệt không hỗ trợ TTS', 'error');
+                return;
+            }
+            
+            if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+                console.log("Cancelling previous speech before speaking new segment.");
+                utteranceWasCancelled = true; 
+                window.speechSynthesis.cancel();
+            } else {
+                 utteranceWasCancelled = false; // Ensure flag is reset if nothing was speaking
+            }
+            
+            updateStatus('Đang chuẩn bị phát...', 'loading');
+
+            currentUtterance = new SpeechSynthesisUtterance(textToSpeakSegment);
+            if (rateControl) currentUtterance.rate = parseFloat(rateControl.value);
+            if (pitchControl) currentUtterance.pitch = parseFloat(pitchControl.value);
+            
+            const voices = speechSynthesis.getVoices();
+            const vietnameseVoice = voices.find(voice => voice.lang === 'vi-VN' || voice.lang.startsWith('vi'));
+            if (vietnameseVoice) {
+                currentUtterance.voice = vietnameseVoice;
+                console.log("Using Vietnamese voice:", vietnameseVoice.name);
+            } else {
+                console.warn("Không tìm thấy giọng đọc tiếng Việt. Sử dụng giọng mặc định của trình duyệt.");
+            }
+
+            currentUtterance.onstart = function() {
+                console.log("Speech started for segment:", textToSpeakSegment);
+                isSpeaking = true;
+                isPaused = false;
+                utteranceWasCancelled = false; // Reset flag once new speech actually starts
+                updateStatus('Đang phát...', 'playing');
+                if (speakBtn) { speakBtn.disabled = true; speakBtn.classList.add('btn-disabled'); }
+                if (pauseBtn) { pauseBtn.disabled = false; pauseBtn.classList.remove('btn-disabled'); }
+                if (resumeBtn) { resumeBtn.disabled = true; resumeBtn.classList.add('btn-disabled'); }
+            };
+            
+            currentUtterance.onend = function(event) {
+                console.log("Speech ended for segment:", textToSpeakSegment, "Cancelled:", utteranceWasCancelled);
+                if (event.target === currentUtterance) { // Ensure it's the correct utterance
+                    if (!utteranceWasCancelled) {
+                        if (isFullRead) {
+                            lastSpokenIndex = ttsInput.value.length; 
+                        } else {
+                            // Find the actual start of the spoken segment in the full text to correctly advance index
+                            const fullText = ttsInput.value;
+                            const segmentStartIndex = fullText.indexOf(textToSpeakSegment, lastSpokenIndex - textToSpeakSegment.length - 10 > 0 ? lastSpokenIndex - textToSpeakSegment.length -10 : 0); // Search around lastSpokenIndex
+                            
+                            if (segmentStartIndex !== -1 && segmentStartIndex >= lastSpokenIndex -1 ) { // Check if found at or after expected
+                                lastSpokenIndex = segmentStartIndex + textToSpeakSegment.length;
+                            } else {
+                                lastSpokenIndex += textToSpeakSegment.length; 
+                            }
+                        }
+                        if (ttsInput && ttsInput.value) {
+                            lastSpokenIndex = Math.min(lastSpokenIndex, ttsInput.value.length);
+                        } else {
+                            lastSpokenIndex = 0;
+                        }
+                         console.log("Updated lastSpokenIndex to:", lastSpokenIndex);
+                    }
+                }
+                resetSpeechControls();
+                if (!window.speechSynthesis.pending && !window.speechSynthesis.speaking) {
+                    updateStatus('Hoàn thành phát giọng đọc', 'ready');
+                }
+                utteranceWasCancelled = false; // Reset flag
+            };
+
+            currentUtterance.onerror = function(event) {
+                console.error('SpeechSynthesisUtterance.onerror for segment:', textToSpeakSegment, event, "Cancelled:", utteranceWasCancelled);
+                if (event.target === currentUtterance) {
+                    // Do not update lastSpokenIndex on error
+                }
+                resetSpeechControls();
+                updateStatus(`Lỗi phát giọng: ${event.error}`, 'error');
+                utteranceWasCancelled = false; // Reset flag
+            };
+            
+            setTimeout(() => {
+                if (currentUtterance) { 
+                    window.speechSynthesis.speak(currentUtterance);
+                }
+            }, 100); 
+            
+            if (ttsInput && ttsInput.value.trim() !== "") {
+                 addHistoryToFirestore(ttsInput.value, parseFloat(rateControl.value), parseFloat(pitchControl.value));
+            }
+        }
+        
+        async function addHistoryToFirestore(text, rate, pitch) {
+            if (!db || !historyCollectionRef || !currentUserId) {
+                console.warn("Firestore or user not ready, cannot add history.");
+                return;
+            }
+            try {
+                await addDoc(historyCollectionRef, {
+                    text: text, 
+                    rate: rate,
+                    pitch: pitch,
+                    userId: currentUserId, 
+                    createdAt: serverTimestamp(), 
+                    clientDate: new Date().toLocaleString('vi-VN') 
+                });
+                console.log("History item added to Firestore for text context:", text);
+            } catch (error) {
+                console.error("Error adding history to Firestore: ", error);
+                updateStatus('Lỗi lưu lịch sử: ' + error.message, 'error');
+            }
+        }
+        
+        function loadHistoryFromFirestore() {
+             if (!db || !historyCollectionRef) {
+                updateStatus('Firestore chưa sẵn sàng để tải lịch sử.', 'error');
+                return;
+            }
+            updateStatus('Đang tải lịch sử...', 'loading');
+
+            const q = query(historyCollectionRef, orderBy('createdAt', 'desc'), firestoreLimit(15));
+            
+            onSnapshot(q, (querySnapshot) => {
+                const firestoreHistory = [];
+                querySnapshot.forEach((docSnap) => { // Renamed doc to docSnap
+                    firestoreHistory.push({ id: docSnap.id, ...docSnap.data() });
+                });
+                renderHistoryList(firestoreHistory);
+                if (statusText && firestoreHistory.length === 0 && statusText.textContent === 'Đang tải lịch sử...') {
+                     updateStatus('Lịch sử trống. Hãy tạo một vài bản ghi!', 'info');
+                } else if (statusText && statusText.textContent === 'Đang tải lịch sử...') {
+                     updateStatus('Lịch sử đã được tải.', 'ready');
+                }
+            }, (error) => {
+                console.error("Error fetching history from Firestore: ", error);
+                updateStatus('Lỗi tải lịch sử: ' + error.message, 'error');
+            });
+        }
+
+        function renderHistoryList(historyItems) {
+            if (!historyList) return; 
+            historyList.innerHTML = ''; 
+            
+            if (historyItems.length === 0) {
+                const emptyItem = document.createElement('li');
+                emptyItem.className = 'history-item';
+                emptyItem.textContent = 'Chưa có lịch sử';
+                emptyItem.style.justifyContent = 'center';
+                emptyItem.style.color = '#7f8c8d';
+                historyList.appendChild(emptyItem);
+                return;
+            }
+            
+            historyItems.forEach(item => {
+                const historyItemElement = document.createElement('li');
+                historyItemElement.className = 'history-item';
+                historyItemElement.setAttribute('data-id', item.id);
+                
+                const textDiv = document.createElement('div');
+                textDiv.className = 'history-text';
+                textDiv.textContent = item.text;
+                
+                const dateDiv = document.createElement('div');
+                dateDiv.className = 'history-date';
+                let displayDate = item.clientDate;
+                if (!displayDate && item.createdAt && item.createdAt.toDate) {
+                    displayDate = item.createdAt.toDate().toLocaleString('vi-VN');
+                } else if (!displayDate) {
+                    displayDate = "Không rõ ngày";
+                }
+                dateDiv.textContent = displayDate;
+                
+                historyItemElement.appendChild(textDiv);
+                historyItemElement.appendChild(dateDiv);
+                
+                historyItemElement.addEventListener('click', function() {
+                    if (ttsInput) {
+                        ttsInput.value = item.text;
+                        lastSpokenIndex = 0; 
+                    }
+                    if (rateControl) rateControl.value = item.rate;
+                    if (pitchControl) pitchControl.value = item.pitch;
+                    updateSliderValues();
+                    updateStatus('Đã tải văn bản từ lịch sử. Nhấn "Đọc toàn bộ" để nghe.', 'info');
+                    if (ttsInput) ttsInput.focus();
+                });
+                
+                historyList.appendChild(historyItemElement);
+            });
+        }
+        
+        function loadVoices() {
+            if ('speechSynthesis' in window && speechSynthesis) {
+                const voices = speechSynthesis.getVoices();
+                if (voices.length > 0) {
+                    console.log("Voices already loaded:", voices.length);
+                } else {
+                    speechSynthesis.onvoiceschanged = function() {
+                        const loadedVoices = speechSynthesis.getVoices();
+                        console.log("Voices loaded via onvoiceschanged:", loadedVoices.length);
+                    };
+                }
+            }
+        }
+        loadVoices();
+
+    </script>
+</body>
+</html>
