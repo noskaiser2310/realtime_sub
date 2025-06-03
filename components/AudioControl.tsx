@@ -1,7 +1,9 @@
+
 import React from 'react';
 import { RecordingState } from '../types';
 import type { LanguageOption, ThemeType } from '../types';
 import { PlayIcon, StopIcon, RecordingStatusIcon } from './icons/MediaIcons';
+import { MicIcon, MicOffIcon } from './icons/FeatureIcons'; // Added MicIcon, MicOffIcon
 import { LanguageSelector } from './LanguageSelector';
 import { LoadingSpinner } from '../LoadingSpinner';
 import { MicrophoneVolumeIndicator } from './MicrophoneVolumeIndicator';
@@ -23,6 +25,9 @@ interface AudioControlProps {
   micInputClarityHint?: 'low' | 'normal';
   isSessionLoaded?: boolean;
   theme: ThemeType;
+  isMicMuted: boolean; // New prop
+  onToggleMicMute: () => void; // New prop
+  canToggleMute: boolean; // New prop
 }
 
 export const AudioControl: React.FC<AudioControlProps> = ({
@@ -42,6 +47,9 @@ export const AudioControl: React.FC<AudioControlProps> = ({
   micInputClarityHint,
   isSessionLoaded = false,
   theme,
+  isMicMuted,
+  onToggleMicMute,
+  canToggleMute,
 }) => {
   const formatTime = (seconds: number): string => {
     const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
@@ -50,18 +58,21 @@ export const AudioControl: React.FC<AudioControlProps> = ({
     return `${h}:${m}:${s}`;
   };
 
-  const isRecording = recordingState === RecordingState.Recording;
-  const canStartRecording = !isRecording && !isLoading && recordingState !== RecordingState.Error && !isSessionLoaded;
-  const langSelectorsDisabled = isRecording || isLoading || isSessionLoaded;
+  const isRecordingActive = recordingState === RecordingState.Recording;
+  // Allow starting recording even if a session is loaded.
+  // The onStartRecording handler in MainPage will clear the loaded session.
+  const canStartRecording = !isRecordingActive && !isLoading && recordingState !== RecordingState.Error;
+  const langSelectorsDisabled = isRecordingActive || isLoading; // Session loaded no longer disables language selectors immediately, MainPage handles this based on recording state.
 
   const timeColor = theme === 'dark' ? 'text-slate-200' : 'text-slate-700';
   const statusTextColor = theme === 'dark' ? 'text-slate-400' : 'text-slate-500';
-
+  const muteButtonBg = theme === 'dark' ? (isMicMuted ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-600 hover:bg-slate-500') : (isMicMuted ? 'bg-red-500 hover:bg-red-600' : 'bg-slate-300 hover:bg-slate-400');
+  const muteButtonText = theme === 'dark' ? 'text-white' : (isMicMuted ? 'text-white' : 'text-slate-700');
 
   return (
     <div className="flex flex-col items-center space-y-6">
-      <div className="flex items-center space-x-6">
-        {isRecording ? (
+      <div className="flex items-center space-x-4"> {/* Adjusted space for mute button */}
+        {isRecordingActive ? (
           <button
             onClick={onStopRecording}
             className="flex items-center justify-center w-24 h-24 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-lg transition-all duration-150 ease-in-out focus:outline-none focus:ring-4 focus:ring-red-500 focus:ring-opacity-50"
@@ -80,9 +91,10 @@ export const AudioControl: React.FC<AudioControlProps> = ({
             {isLoading ? <LoadingSpinner size="lg" /> : <PlayIcon className="w-10 h-10" />}
           </button>
         )}
+        
         <div className="text-center min-w-[100px]">
           <div className={`text-4xl font-mono tracking-wider ${timeColor}`}>{formatTime(elapsedTime)}</div>
-          {isRecording && (
+          {isRecordingActive && (
             <div className="flex items-center justify-center mt-1 text-red-400">
               <RecordingStatusIcon className="w-5 h-5 animate-pulse mr-1" />
               <span>Đang ghi</span>
@@ -93,6 +105,16 @@ export const AudioControl: React.FC<AudioControlProps> = ({
            {recordingState === RecordingState.Error && <div className="mt-1 text-red-500">Lỗi ghi âm</div>}
            {recordingState === RecordingState.Idle && !isSessionLoaded && <div className={`mt-1 ${statusTextColor}`}>Sẵn sàng ghi</div>}
         </div>
+
+        <button
+          onClick={onToggleMicMute}
+          disabled={!canToggleMute}
+          className={`flex items-center justify-center w-12 h-12 rounded-full shadow-md transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-opacity-50 ${muteButtonBg} ${muteButtonText} ${theme === 'dark' ? 'focus:ring-slate-400' : 'focus:ring-slate-500'} disabled:opacity-50 disabled:cursor-not-allowed`}
+          aria-label={isMicMuted ? "Bật tiếng micro" : "Tắt tiếng micro"}
+          title={isMicMuted ? "Bật tiếng micro" : "Tắt tiếng micro"}
+        >
+          {isMicMuted ? <MicOffIcon className="w-6 h-6" /> : <MicIcon className="w-6 h-6" />}
+        </button>
       </div>
       
       <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
@@ -117,7 +139,8 @@ export const AudioControl: React.FC<AudioControlProps> = ({
         <div className="w-full pt-2">
            <MicrophoneVolumeIndicator 
               volumeLevel={micVolumeLevel} 
-              isActive={isRecording} 
+              isActive={isRecordingActive}
+              isMuted={isMicMuted} 
               clarityHint={micInputClarityHint}
               theme={theme}
             />

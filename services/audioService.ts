@@ -11,6 +11,7 @@ const RECENT_VOLUME_HISTORY_LENGTH = 20; // Number of volume samples for averagi
 let internalState: RecordingState = RecordingState.Idle;
 let serviceCallbacks: ServiceCallbacks | null = null;
 let currentSourceLanguageCode: string = 'en'; // Default, will be updated by startAudioProcessing
+let isMicMutedByUser: boolean = false;
 
 // Audio acquisition and mixing
 let userMicStream: MediaStream | null = null;
@@ -43,6 +44,7 @@ export interface ServiceCallbacks {
   onStateChange: (newState: RecordingState, details?: { errorMessage?: string; fullAudioBlob?: Blob | null }) => void;
   onNewTranscriptChunk: (transcript: string) => void;
   onVolumeUpdate: (volume: number, clarityHint: 'low' | 'normal') => void;
+  onMicMuteStateChange?: (isMuted: boolean) => void;
 }
 
 const updateState = (newState: RecordingState, details?: { errorMessage?: string; fullAudioBlob?: Blob | null }) => {
@@ -87,6 +89,7 @@ const setupAudioVisualizer = async (micStream: MediaStream) => {
       }
       visualizerAnalyserNode.getByteFrequencyData(visualizerDataArray);
       let sum = 0;
+      // If mic is muted, dataArray will be all zeros (or close to it), so volume will be 0.
       for (const amplitude of visualizerDataArray) sum += amplitude * amplitude;
       const normalizedVolume = Math.min(100, (Math.sqrt(sum / visualizerDataArray.length) / 128) * 100 * 1.7); 
 
@@ -94,7 +97,7 @@ const setupAudioVisualizer = async (micStream: MediaStream) => {
       if (recentVolumeLevels.length > RECENT_VOLUME_HISTORY_LENGTH) recentVolumeLevels.shift();
       
       let clarityHint: 'low' | 'normal' = 'normal';
-      if (recentVolumeLevels.length >= RECENT_VOLUME_HISTORY_LENGTH * 0.75) {
+      if (!isMicMutedByUser && recentVolumeLevels.length >= RECENT_VOLUME_HISTORY_LENGTH * 0.75) { // Only show hint if not muted
         const avgRecentVolume = recentVolumeLevels.reduce((s, v) => s + v, 0) / recentVolumeLevels.length;
         if (avgRecentVolume < LOW_VOLUME_THRESHOLD) {
           lowVolumeConsecutiveChecks++;
@@ -103,7 +106,8 @@ const setupAudioVisualizer = async (micStream: MediaStream) => {
           lowVolumeConsecutiveChecks = 0;
         }
       }
-      serviceCallbacks?.onVolumeUpdate(normalizedVolume, clarityHint);
+      // Report 0 volume if muted, otherwise actual volume.
+      serviceCallbacks?.onVolumeUpdate(isMicMutedByUser ? 0 : normalizedVolume, clarityHint);
       visualizerAnimationFrameId = requestAnimationFrame(draw);
     };
     visualizerAnimationFrameId = requestAnimationFrame(draw);
@@ -134,6 +138,9 @@ const acquireAudioStreams = async (): Promise<boolean> => {
     if (originalMicTracks.length === 0) {
       throw new Error("Không có rãnh âm thanh nào từ micro.");
     }
+    // Ensure mic is initially unmuted (tracks enabled)
+    originalMicTracks.forEach(track => track.enabled = true);
+
 
     try {
         displayAudioStream = await navigator.mediaDevices.getDisplayMedia({
@@ -182,7 +189,9 @@ const acquireAudioStreams = async (): Promise<boolean> => {
 };
 
 const processRecordedSegment = async (audioBlob: Blob) => {
-  if (!serviceCallbacks) return;
+  if (!serviceCallbacks) return; 
+  // If isMicMutedByUser is true, the audioBlob will contain only system audio (if any) or silence from the mic component of mixedAudioStream.
+  // Transcription will proceed on this content.
   try {
     const reader = new FileReader();
     reader.readAsDataURL(audioBlob);
@@ -243,7 +252,7 @@ const startNextSegmentRecording = () => {
       const segmentBlob = new Blob(segmentChunks, { type: recorderThatStopped?.mimeType || currentSegmentMimeType });
       logAudio(`Collected segment blob. Size: ${segmentBlob.size}, Type: ${segmentBlob.type}. Pushing to allRecordedBlobs.`);
       allRecordedBlobs.push(segmentBlob);
-      await processRecordedSegment(segmentBlob);
+      await processRecordedSegment(segmentBlob); // Always process, content depends on mute state
     } else {
       logAudio("Segment recorded but segmentChunks is empty. No blob to process or add.");
     }
@@ -317,6 +326,9 @@ const performFinalCleanup = () => {
   }
   allRecordedBlobs.length = 0; 
 
+  isMicMutedByUser = false;
+  serviceCallbacks?.onMicMuteStateChange?.(false);
+
   if (previousState !== RecordingState.Error) { 
      updateState(RecordingState.Stopped, { fullAudioBlob: finalBlob });
   } else if (internalState !== RecordingState.Error) { 
@@ -329,6 +341,8 @@ const performFinalCleanup = () => {
 export const initAudioService = (callbacks: ServiceCallbacks) => {
   serviceCallbacks = callbacks;
   updateState(RecordingState.Idle);
+  isMicMutedByUser = false; // Ensure mute state is reset on init
+  serviceCallbacks?.onMicMuteStateChange?.(false);
 };
 
 export const startAudioProcessing = async (sourceLanguageCode: string) => {
@@ -339,6 +353,10 @@ export const startAudioProcessing = async (sourceLanguageCode: string) => {
   updateState(RecordingState.Initializing);
   allRecordedBlobs.length = 0; 
   currentSourceLanguageCode = sourceLanguageCode; // Store the language code
+  
+  isMicMutedByUser = false; // Ensure mic is unmuted at the start of new processing
+  serviceCallbacks?.onMicMuteStateChange?.(false);
+
 
   const streamsAcquired = await acquireAudioStreams();
   if (!streamsAcquired) {
@@ -351,6 +369,8 @@ export const startAudioProcessing = async (sourceLanguageCode: string) => {
     performFinalCleanup();
     return;
   }
+  // Ensure mic tracks are enabled (in case they were left disabled from a previous error/state)
+  originalMicTracks.forEach(track => track.enabled = true);
 
   await setupAudioVisualizer(userMicStream);
   currentSegmentMimeType = determineSegmentMimeType();
@@ -382,6 +402,28 @@ export const stopAudioProcessing = () => {
   }
 };
 
+export const toggleMicrophoneMute = () => {
+    if (internalState !== RecordingState.Recording) {
+        logAudio("Cannot toggle mute: Not currently recording.");
+        return;
+    }
+    if (!userMicStream || originalMicTracks.length === 0) {
+        logAudio("Cannot toggle mute: User microphone stream or tracks not available.");
+        return;
+    }
+    isMicMutedByUser = !isMicMutedByUser;
+    originalMicTracks.forEach(track => {
+        track.enabled = !isMicMutedByUser;
+    });
+    logAudio(`Microphone mute toggled. Mic is now ${isMicMutedByUser ? 'MUTED' : 'UNMUTED'}. Tracks enabled: ${!isMicMutedByUser}`);
+    serviceCallbacks?.onMicMuteStateChange?.(isMicMutedByUser);
+
+    // If muted, ensure volume indicator shows 0 immediately
+    if (isMicMutedByUser) {
+        serviceCallbacks?.onVolumeUpdate(0, 'normal');
+    }
+};
+
 export const cleanupAudioService = () => {
   if (internalState === RecordingState.Recording || internalState === RecordingState.Stopping || internalState === RecordingState.Initializing) {
     stopAudioProcessing(); 
@@ -393,4 +435,8 @@ export const cleanupAudioService = () => {
 
 export const getCurrentAudioState = (): RecordingState => {
     return internalState;
+};
+
+export const getIsMicMuted = (): boolean => {
+    return isMicMutedByUser;
 };

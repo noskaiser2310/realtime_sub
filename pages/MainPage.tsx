@@ -14,7 +14,7 @@ import type { MeetingSessionData } from '../services/sessionService'; // Updated
 import { RecordingState, SummaryType } from '../types';
 import type { LanguageOption, SummaryContent, AppSettings } from '../types';
 import { INITIAL_SUMMARY_CONTENT, SUPPORTED_LANGUAGES } from '../constants';
-import { MicIcon, DownloadIcon, BrainIcon, LanguagesIcon, ChatBubbleIcon, FileAudioIcon, VolumeUpIcon, EditIcon, UserCircleIcon, LogoutIcon, SaveIcon, CogIcon, ArchiveIcon, LoadIcon, TrashIcon, SettingsIcon } from '../components/icons/FeatureIcons';
+import { MicIcon, DownloadIcon, BrainIcon, LanguagesIcon, ChatBubbleIcon, FileAudioIcon, VolumeUpIcon, EditIcon, UserCircleIcon, LogoutIcon, SaveIcon, CogIcon, ArchiveIcon, LoadIcon, TrashIcon, SettingsIcon, MicOffIcon } from '../components/icons/FeatureIcons';
 import { SpeakerOnIcon, SpeakerOffIcon, PlayIcon, StopIcon, PauseIcon } from '../components/icons/MediaIcons';
 import { LoadingSpinner } from '../LoadingSpinner';
 
@@ -56,10 +56,13 @@ export const MainPage: React.FC<MainPageProps> = ({
   const [isGeminiChatbotLoading, setIsGeminiChatbotLoading] = useState<boolean>(false);
   const [isGeminiTranslationLoading, setIsGeminiTranslationLoading] = useState<boolean>(false);
 
-  const [autoSpeakTranslation, setAutoSpeakTranslation] = useState<boolean>(true); 
+  // Auto-speak per segment is removed. TTS is manual via "Speak All".
+  // const [autoSpeakTranslation, setAutoSpeakTranslation] = useState<boolean>(true); 
   const [canSpeakCurrentTargetLang, setCanSpeakCurrentTargetLang] = useState<boolean>(false);
   const [isTtsActive, setIsTtsActive] = useState<boolean>(false); 
   const [isTtsPaused, setIsTtsPaused] = useState<boolean>(false);
+  const [isMicMuted, setIsMicMuted] = useState<boolean>(false);
+
 
   const [savedMeetingSessions, setSavedMeetingSessions] = useState<MeetingSessionData[]>([]);
   const [loadedMeetingSessionId, setLoadedMeetingSessionId] = useState<string | null>(null);
@@ -111,6 +114,7 @@ export const MainPage: React.FC<MainPageProps> = ({
     ttsService.cancel(); 
     translationQueueRef.current = [];
     setLoadedMeetingSessionId(null); 
+    setIsMicMuted(audioService.getIsMicMuted()); // Sync with service state on reset
   };
 
   const processTranslationQueue = useCallback(async () => {
@@ -146,10 +150,10 @@ export const MainPage: React.FC<MainPageProps> = ({
         return newFullTranslation;
       });
 
-      const textToSpeak = isSameLanguage ? chunkToProcess : translatedChunk;
-      if (autoSpeakTranslation && canSpeakCurrentTargetLang && textToSpeak.trim()) {
-        ttsService.speak(textToSpeak, targetLanguage.code, false); 
-      }
+      // Removed automatic speaking of individual chunks here
+      // if (autoSpeakTranslation && canSpeakCurrentTargetLang && textToSpeak.trim()) {
+      //   ttsService.speak(textToSpeak, targetLanguage.code, false); 
+      // }
     }
     
     setIsGeminiTranslationLoading(false);
@@ -158,7 +162,7 @@ export const MainPage: React.FC<MainPageProps> = ({
     if (translationQueueRef.current.length > 0) {
       processTranslationQueue();
     }
-  }, [sourceLanguage.code, targetLanguage.code, autoSpeakTranslation, canSpeakCurrentTargetLang, userData.id, showToast]);
+  }, [sourceLanguage.code, targetLanguage.code, /* autoSpeakTranslation, */ /* canSpeakCurrentTargetLang, */ userData.id, showToast]);
 
 
   const handleAudioStateChange = useCallback((newState: RecordingState, details?: { errorMessage?: string; fullAudioBlob?: Blob | null }) => {
@@ -220,6 +224,10 @@ export const MainPage: React.FC<MainPageProps> = ({
       micVolumeLevelRef.current = volume;
       micClarityHintRef.current = clarityHint;
   }, []);
+
+  const handleMicMuteStateChange = useCallback((muted: boolean) => {
+    setIsMicMuted(muted);
+  }, []);
   
   const handleTTSError = useCallback((message: string) => {
     console.error("MainPage.tsx - TTS Error reported:", message);
@@ -245,7 +253,9 @@ export const MainPage: React.FC<MainPageProps> = ({
       onStateChange: handleAudioStateChange,
       onNewTranscriptChunk: handleNewTranscriptChunk,
       onVolumeUpdate: handleMicVolumeUpdate,
+      onMicMuteStateChange: handleMicMuteStateChange,
     });
+    setIsMicMuted(audioService.getIsMicMuted()); // Initialize from service
 
     ttsService.init(
       {
@@ -263,7 +273,7 @@ export const MainPage: React.FC<MainPageProps> = ({
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
       if (fullRecordingAudioBlobURL.current) URL.revokeObjectURL(fullRecordingAudioBlobURL.current);
     };
-  }, [handleAudioStateChange, handleNewTranscriptChunk, handleMicVolumeUpdate, handleTTSError, handleTTSActivityChange, handleTTSLanguageSupportChange, targetLanguage.code]);
+  }, [handleAudioStateChange, handleNewTranscriptChunk, handleMicVolumeUpdate, handleMicMuteStateChange, handleTTSError, handleTTSActivityChange, handleTTSLanguageSupportChange, targetLanguage.code]);
 
 
   useEffect(() => {
@@ -284,9 +294,11 @@ export const MainPage: React.FC<MainPageProps> = ({
     setElapsedTime(0);
     micErrorRef.current = false; 
     setIsUiLocked(true); 
+    setIsMicMuted(false); // Ensure UI reflects unmuted state at start
 
     try {
       await audioService.startAudioProcessing(sourceLanguage.code); 
+      // audioService will call onMicMuteStateChange(false) internally on start
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = window.setInterval(() => {
         setElapsedTime(prev => prev + 1);
@@ -302,7 +314,7 @@ export const MainPage: React.FC<MainPageProps> = ({
   }, [currentRecordingState, sourceLanguage.code, userData.id, showToast]);
 
   const handleStopRecording = useCallback(() => {
-    audioService.stopAudioProcessing();
+    audioService.stopAudioProcessing(); // This will trigger onMicMuteStateChange(false) from service
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     const activeMeetingId = sessionService.getCurrentActiveMeetingSessionId();
     if (isEditingTranscript) { 
@@ -316,6 +328,14 @@ export const MainPage: React.FC<MainPageProps> = ({
         sessionService.updateCurrentMeetingSessionData(activeMeetingId, { isComplete: true });
     }
   }, [isEditingTranscript, editedTranscript, meetingTranscript, userData.id]);
+  
+  const handleToggleMicMute = useCallback(() => {
+      if (currentRecordingState === RecordingState.Recording) {
+        audioService.toggleMicrophoneMute();
+        // setIsMicMuted will be updated via the onMicMuteStateChange callback
+      }
+  }, [currentRecordingState]);
+
 
   const handleSummarize = useCallback(async (type: SummaryType) => {
     if (!currentActiveTranscript.trim() || isGeminiSummaryLoading) return;
@@ -417,15 +437,7 @@ export const MainPage: React.FC<MainPageProps> = ({
     downloadFile(audioUrlToDownload, `recording.${audioMimeType?.split('/')[1] || 'webm'}`, audioMimeType || 'audio/webm');
   }, [downloadFile, loadedMeetingSessionId, showToast]);
 
-  const toggleAutoSpeak = useCallback(() => {
-    setAutoSpeakTranslation(prev => {
-      const newState = !prev;
-      if (!newState) { 
-        ttsService.cancel();
-      }
-      return newState;
-    });
-  }, []);
+  // Removed toggleAutoSpeak as auto-speak per segment is removed
 
   const handleSpeakAllProcessedText = useCallback(() => {
     const textToSpeak = sourceLanguage.code === targetLanguage.code ? currentActiveTranscript : fullTranslatedTranscript;
@@ -656,6 +668,9 @@ export const MainPage: React.FC<MainPageProps> = ({
                 micInputClarityHint={micClarityHintRef.current}
                 isSessionLoaded={!!loadedMeetingSessionId}
                 theme={appSettings.theme}
+                isMicMuted={isMicMuted}
+                onToggleMicMute={handleToggleMicMute}
+                canToggleMute={currentRecordingState === RecordingState.Recording}
             />
           </div>
           
@@ -704,16 +719,7 @@ export const MainPage: React.FC<MainPageProps> = ({
                     </h2>
                     {ttsPrimaryTextAvailable && (
                         <div className="flex items-center space-x-2">
-                            {canSpeakCurrentTargetLang && (
-                            <button
-                                onClick={toggleAutoSpeak}
-                                className={`p-2 rounded-md ${autoSpeakTranslation ? 'bg-green-500 hover:bg-green-600' : (appSettings.theme === 'dark' ? 'bg-slate-600 hover:bg-slate-500' : 'bg-slate-300 hover:bg-slate-400')} text-white transition-colors`}
-                                title={autoSpeakTranslation ? "Tắt tự động phát từng đoạn" : "Bật tự động phát từng đoạn"}
-                                aria-pressed={autoSpeakTranslation}
-                            >
-                                {autoSpeakTranslation ? <SpeakerOnIcon className="w-5 h-5" /> : <SpeakerOffIcon className="w-5 h-5" />}
-                            </button>
-                            )}
+                            {/* Auto-speak toggle removed */}
                             {canSpeakCurrentTargetLang && (
                             <button
                                 onClick={handleSpeakAllProcessedText}
@@ -737,12 +743,8 @@ export const MainPage: React.FC<MainPageProps> = ({
                   content={translationLoadingMessage || fullTranslatedTranscript} 
                   theme={appSettings.theme}
                 />
-                {autoSpeakTranslation && !canSpeakCurrentTargetLang && sourceLanguage.code !== targetLanguage.code && (
-                <p className={`text-sm text-yellow-400 text-center mt-2 p-2 rounded-md ${appSettings.theme === 'dark' ? 'bg-yellow-900/30' : 'bg-yellow-100 text-yellow-700'}`}>
-                    Cảnh báo: Tự động phát đang BẬT, nhưng trình duyệt không hỗ trợ phát âm thanh cho ngôn ngữ "{targetLanguage.name}".
-                </p>
-                )}
-                {!autoSpeakTranslation && !canSpeakCurrentTargetLang && sourceLanguage.code !== targetLanguage.code && (
+                {/* Warning message for auto-speak removed as feature is removed */}
+                {!canSpeakCurrentTargetLang && sourceLanguage.code !== targetLanguage.code && ttsPrimaryTextAvailable && (
                     <p className={`text-xs text-center mt-1 ${appSettings.theme === 'dark' ? 'text-yellow-600' : 'text-yellow-700'}`}>Trình duyệt không hỗ trợ phát âm thanh cho ngôn ngữ "{targetLanguage.name}".</p>
                 )}
             </div>
@@ -849,28 +851,6 @@ export const MainPage: React.FC<MainPageProps> = ({
                     </ul>
                 )}
                 <p className={`text-xs mt-3 text-center italic ${appSettings.theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Dữ liệu phiên được lưu trữ tạm thời trong trình duyệt của bạn.</p>
-            </div>
-          )}
-
-          {userData.id && loadedMeetingSessionId && ( 
-            <div className={`p-6 rounded-xl shadow-2xl ${appSettings.theme === 'dark' ? 'bg-slate-800' : 'bg-white'}`}>
-                <h2 className={`text-xl font-semibold mb-3 flex items-center ${appSettings.theme === 'dark' ? 'text-indigo-300' : 'text-indigo-700'}`}>
-                    <CogIcon className="w-6 h-6 mr-2" />
-                    Công cụ Xử lý Hậu kỳ (Demo - cho phiên đã tải)
-                </h2>
-                <div className={`p-4 rounded-lg space-y-3 ${appSettings.theme === 'dark' ? 'bg-slate-700/50' : 'bg-slate-100'}`}>
-                    <p className={`text-sm italic ${appSettings.theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                        Các tính năng này minh họa cho khả năng xử lý hậu kỳ trên các phiên đã lưu.
-                        Yêu cầu backend để lưu trữ và quản lý phiên.
-                    </p>
-                    <button 
-                        disabled 
-                        className="w-full bg-indigo-500 text-white font-medium py-2.5 px-4 rounded-lg shadow-md transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm"
-                        title="Tính năng này yêu cầu backend"
-                    >
-                        Phân tách người nói (Demo)
-                    </button>
-                </div>
             </div>
           )}
         </section>

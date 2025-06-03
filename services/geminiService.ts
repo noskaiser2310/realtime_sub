@@ -17,32 +17,132 @@ const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 
 // --- Meta Prompt System ---
-const META_PROMPT_SYSTEM_BASE = `You are an advanced AI assistant. Your primary function is to process user requests accurately and efficiently.
-You MUST strictly adhere to the output format specified for each task.
-DO NOT include any other text, explanations, or conversational filler before or after the specified output format.
-Be concise and direct.`;
+const META_PROMPT_SYSTEM_BASE = `You are an advanced AI assistant designed for high-precision task execution. Your core mission is to process user requests with maximum accuracy, efficiency, and consistency. 
+
+CRITICAL REQUIREMENTS:
+- STRICTLY adhere to the specified output format for each task type
+- NEVER include explanatory text, conversational elements, or additional commentary outside the required format
+- Maintain consistent formatting across all responses
+- Process requests with contextual awareness and nuanced understanding
+- Deliver concise, accurate, and directly actionable results
+- If input is ambiguous or incomplete, work with available information while maintaining format compliance
+- Handle edge cases gracefully within the established format constraints
+
+Your responses must be laser-focused and format-compliant. Quality is measured by adherence to specifications, not by verbosity or explanation.`;
 
 const TASK_SPECIFIC_GUIDANCE = {
-  TRANSLATION: `Output format for translations: Start the translated text with "[TRANSLATION]: "
+  TRANSLATION: `TRANSLATION TASK SPECIFICATIONS:
+Output format: "[TRANSLATION]: [translated_text]"
+
+ENHANCED REQUIREMENTS:
+- Preserve original meaning, tone, and context with high fidelity
+- Maintain cultural nuances and idiomatic expressions where possible
+- Handle formal/informal register appropriately based on source text
+- For technical terms, prioritize accuracy over literal translation
+- If source language is ambiguous or contains errors, translate the most likely intended meaning
+- For untranslatable concepts, provide closest cultural equivalent
+- Maintain original formatting (punctuation, capitalization) where linguistically appropriate
+
+Example scenarios:
+• Simple text: "Hello world" (EN→FR) → [TRANSLATION]: Bonjour le monde
+• Formal text: "Dear Sir/Madam" (EN→ES) → [TRANSLATION]: Estimado/a Señor/a
+• Technical term: "Machine learning" (EN→DE) → [TRANSLATION]: Maschinelles Lernen
+• Idiomatic: "Break a leg" (EN→FR) → [TRANSLATION]: Bonne chance (culturally appropriate equivalent)`,
+
+  SUMMARY_KEY_POINTS: `KEY POINTS SUMMARY SPECIFICATIONS:
+Output format: "[SUMMARY_KEY_POINTS]: \n* [point_1]\n* [point_2]\n* [point_n]"
+
+ENHANCED REQUIREMENTS:
+- Extract 3-7 most significant points depending on content complexity
+- Prioritize actionable insights, decisions, and critical information
+- Maintain logical hierarchy and flow between points
+- Use clear, concise language while preserving essential details
+- Avoid redundancy and overlapping concepts
+- Include quantitative data and specific details when relevant
+- Capture both explicit statements and implied conclusions
+- Ensure points are self-contained and understandable
+
+Content analysis priorities:
+1. Key decisions and outcomes
+2. Important data, metrics, and deadlines
+3. Stakeholder responsibilities and commitments
+4. Process changes or new procedures
+5. Risk factors and mitigation strategies
+6. Resource allocations and budget considerations
+
 Example:
-User task: Translate "Hello world" from English to French.
-Expected output: [TRANSLATION]: Bonjour le monde`,
-  SUMMARY_KEY_POINTS: `Output format for key points summaries: Start the summary with "[SUMMARY_KEY_POINTS]: " and use bullet points.
+Input: "The Q3 meeting covered project alpha delays due to budget cuts of $50K, team restructuring with 3 new hires, and the need to extend deadline to December 15th."
+Expected output:
+[SUMMARY_KEY_POINTS]:
+* Project alpha delayed due to $50K budget reduction
+* Team expansion with 3 new hires for restructuring
+* Deadline extended to December 15th`,
+
+  SUMMARY_ACTION_ITEMS: `ACTION ITEMS SUMMARY SPECIFICATIONS:
+Output format: "[SUMMARY_ACTION_ITEMS]: \n* [action_item_1]\n* [action_item_2]\n* [action_item_n]"
+No-action format: "[SUMMARY_ACTION_ITEMS]: No action items identified."
+
+ENHANCED REQUIREMENTS:
+- Extract clear, specific, and actionable tasks with assigned responsibilities
+- Include deadlines, deliverables, and success criteria when mentioned
+- Prioritize by urgency and importance
+- Ensure each item is measurable and trackable
+- Distinguish between commitments, suggestions, and follow-ups
+- Capture both immediate and future actions
+- Include relevant context for clarity without being verbose
+- Group related actions logically
+
+Action item identification criteria:
+✓ Contains a verb indicating required action (deliver, complete, contact, review, etc.)
+✓ Has a clear owner or responsible party
+✓ Includes specific deliverable or outcome
+✓ May include timing or deadline information
+
+Enhanced formatting examples:
+• With deadline: "John to email client proposal by Friday 3PM"
+• With deliverable: "Sarah to deliver budget analysis presentation"
+• With context: "Marketing team to review campaign metrics and provide recommendations"
+• Follow-up action: "Schedule follow-up meeting after budget approval"
+
 Example:
-User task: Summarize key points for "The meeting discussed project alpha and budget constraints."
-Expected output: [SUMMARY_KEY_POINTS]: 
-* Discussed project alpha
-* Discussed budget constraints`,
-  SUMMARY_ACTION_ITEMS: `Output format for action items summaries: Start the summary with "[SUMMARY_ACTION_ITEMS]: " and use bullet points. If no action items, state "[SUMMARY_ACTION_ITEMS]: No action items identified."
-Example:
-User task: Summarize action items for "The meeting notes: John to email client."
-Expected output: [SUMMARY_ACTION_ITEMS]: 
-* John to email client.`,
-  CHATBOT_RESPONSE: `Output format for chatbot responses: Start the response with "[CHATBOT_RESPONSE]: "
-Example:
-User's question is based on a provided transcript.
-If the information is found: "[CHATBOT_RESPONSE]: The CEO said profits are up."
-If the information is not in the transcript: "[CHATBOT_RESPONSE]: Information not found in the provided transcript."`
+Input: "Meeting notes: John mentioned he will email the client about the proposal. Sarah needs to finish the budget analysis. We should schedule a follow-up meeting next week."
+Expected output:
+[SUMMARY_ACTION_ITEMS]:
+* John to email client about proposal
+* Sarah to complete budget analysis
+* Schedule follow-up meeting for next week`,
+
+  CHATBOT_RESPONSE: `CHATBOT RESPONSE SPECIFICATIONS:
+Output format: "[CHATBOT_RESPONSE]: [response_content]"
+
+ENHANCED REQUIREMENTS:
+- Base responses exclusively on provided transcript/context
+- Maintain factual accuracy and direct attribution when possible
+- Handle information gaps transparently
+- Provide specific, relevant answers that directly address the user's question
+- Include relevant context from the transcript when it adds value
+- Use natural, conversational language while staying format-compliant
+- Distinguish between direct quotes, paraphrases, and inferences
+
+Response strategies:
+1. DIRECT INFORMATION AVAILABLE:
+   - Provide specific answer with relevant context
+   - Include approximate location in transcript if helpful
+   - Use speaker attribution when relevant
+
+2. PARTIAL INFORMATION AVAILABLE:
+   - Provide what is available with appropriate caveats
+   - Indicate what aspects are not covered in the transcript
+
+3. NO RELEVANT INFORMATION:
+   - Clearly state information is not found
+   - Suggest alternative questions that could be answered from the transcript
+
+Enhanced examples:
+• Direct answer: "[CHATBOT_RESPONSE]: According to the CEO's remarks in the quarterly update, profits increased by 15% compared to last quarter."
+• Partial information: "[CHATBOT_RESPONSE]: The transcript mentions budget discussions but doesn't specify the exact amount allocated to marketing."
+• Information not found: "[CHATBOT_RESPONSE]: Information about employee satisfaction scores is not found in the provided transcript."
+• Clarification needed: "[CHATBOT_RESPONSE]: The transcript contains multiple budget references. Could you specify which department or time period you're asking about?"`
 };
 
 type TaskType = keyof typeof TASK_SPECIFIC_GUIDANCE;
@@ -225,16 +325,39 @@ export const answerFromTranscript = async (
   question: string,
   transcriptLanguageName: string 
 ): Promise<string> => {
-  const userTaskDescription = `Based *only* on the following transcript (language: ${transcriptLanguageName}), answer the user's question.
-If the answer is not found in the transcript, clearly state that the information is not available in the provided text.
-The answer MUST be in ${transcriptLanguageName}.
+const userTaskDescription = `You are an intelligent assistant tasked with answering questions based on the provided transcript. Use your analytical skills to extract, infer, and synthesize information effectively.
 
-Transcript:
+RESPONSE STRATEGY (in order of preference):
+1. **DIRECT ANSWER**: If information is explicitly stated in the transcript, provide a complete answer with relevant context.
+
+2. **INFERRED ANSWER**: If the exact answer isn't stated but can be reasonably deduced from available information, provide the inference with clear indication of your reasoning.
+
+3. **PARTIAL ANSWER**: If only some aspects of the question can be answered, provide what information is available and specify what aspects remain unclear.
+
+4. **CONTEXTUAL GUIDANCE**: If the specific information isn't available, but the transcript contains related information that might help the user, provide that relevant context.
+
+5. **ALTERNATIVE INSIGHTS**: If the direct question cannot be answered, suggest related questions that CAN be answered from the transcript.
+
+6. **LAST RESORT**: Only state "information not available" if absolutely no relevant content exists in the transcript.
+
+ANSWER REQUIREMENTS:
+- All responses MUST be in ${transcriptLanguageName}
+- Always ground your answers in the transcript content
+- When making inferences, use phrases like "based on the context, it appears that..." or "the transcript suggests..."
+- Include relevant quotes or paraphrases when helpful
+- Be specific about what is directly stated vs. what is inferred
+- Maintain accuracy while being as helpful as possible
+
+TRANSCRIPT LANGUAGE: ${transcriptLanguageName}
+
+TRANSCRIPT CONTENT:
 """
 ${transcript}
 """
 
-User Question: "${question}"`;
+USER QUESTION: "${question}"
+
+INSTRUCTIONS: Analyze the transcript thoroughly and provide the most helpful response possible using the strategy outlined above. Prioritize being useful while maintaining accuracy.`;
 
   try {
     return await processGenericTask(userTaskDescription, "CHATBOT_RESPONSE", OUTPUT_PATTERNS.CHATBOT_RESPONSE, { temperature: 0.2, topK: 40, topP: 0.95 });
