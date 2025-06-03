@@ -49,34 +49,75 @@ Example scenarios:
 • Technical term: "Machine learning" (EN→DE) → [TRANSLATION]: Maschinelles Lernen
 • Idiomatic: "Break a leg" (EN→FR) → [TRANSLATION]: Bonne chance (culturally appropriate equivalent)`,
 
-  SUMMARY_KEY_POINTS: `KEY POINTS SUMMARY SPECIFICATIONS:
-Output format: "[SUMMARY_KEY_POINTS]: \n* [point_1]\n* [point_2]\n* [point_n]"
+ SUMMARY_KEY_POINTS: `COMPREHENSIVE KEY POINTS SUMMARY SPECIFICATIONS:
+Output format: "[SUMMARY_KEY_POINTS]: \n[brief_overview_paragraph]\n\nKEY HIGHLIGHTS:\n* [critical_point_1]\n* [critical_point_2]\n* [critical_point_n]\n\nADDITIONAL INSIGHTS:\n* [supporting_detail_1]\n* [supporting_detail_2]\n* [supporting_detail_n]"
 
-ENHANCED REQUIREMENTS:
-- Extract 3-7 most significant points depending on content complexity
-- Prioritize actionable insights, decisions, and critical information
-- Maintain logical hierarchy and flow between points
-- Use clear, concise language while preserving essential details
-- Avoid redundancy and overlapping concepts
-- Include quantitative data and specific details when relevant
-- Capture both explicit statements and implied conclusions
-- Ensure points are self-contained and understandable
+ENHANCED SUMMARY APPROACH:
+Create a two-tier summary structure that provides both high-level overview and detailed analysis:
 
-Content analysis priorities:
-1. Key decisions and outcomes
-2. Important data, metrics, and deadlines
-3. Stakeholder responsibilities and commitments
-4. Process changes or new procedures
-5. Risk factors and mitigation strategies
-6. Resource allocations and budget considerations
+TIER 1 - BRIEF OVERVIEW:
+- 2-3 sentence paragraph capturing the essence and main theme
+- Provide context and overall significance
+- Set the stage for detailed points below
 
-Example:
-Input: "The Q3 meeting covered project alpha delays due to budget cuts of $50K, team restructuring with 3 new hires, and the need to extend deadline to December 15th."
+TIER 2 - KEY HIGHLIGHTS:
+- 3-5 most critical and impactful points
+- Focus on decisions, outcomes, and major developments
+- Include quantitative data and specific commitments
+- Prioritize actionable and strategic information
+
+TIER 3 - ADDITIONAL INSIGHTS:
+- 3-7 supporting details, context, and secondary information
+- Background information that adds depth
+- Process details, methodologies, or explanatory content
+- Relevant observations and implications
+- Future considerations and potential impacts
+
+CONTENT ANALYSIS FRAMEWORK:
+Primary Focus (Key Highlights):
+1. Critical decisions and final outcomes
+2. Major deadlines, milestones, and deliverables
+3. Budget allocations and resource commitments
+4. Stakeholder responsibilities and accountability
+5. Strategic changes and new initiatives
+
+Secondary Focus (Additional Insights):
+6. Process improvements and procedural updates
+7. Risk factors and mitigation approaches
+8. Performance metrics and progress indicators
+9. Challenges faced and solutions proposed
+10. Future planning and next steps
+11. Stakeholder feedback and concerns
+12. Technical details and implementation methods
+
+QUALITY STANDARDS:
+- Maintain logical flow from overview to specifics
+- Ensure each point is self-contained yet connected
+- Use precise language while remaining accessible
+- Avoid redundancy between tiers
+- Include relevant context without overwhelming detail
+- Balance brevity with completeness
+- Prioritize information that drives action or understanding
+
+ENHANCED EXAMPLE:
+Input: "The Q3 strategic review meeting addressed multiple critical issues. Project Alpha faces significant delays due to unexpected budget constraints, requiring a $50K reduction from the original allocation. To address resource gaps, the team will undergo restructuring with 3 new specialized hires in data analytics and project management. The original September deadline is no longer feasible, necessitating an extension to December 15th. The delay impacts our Q4 launch strategy and requires coordination with the marketing team. Risk mitigation includes weekly progress reviews and stakeholder updates. The budget reduction affects equipment purchases but maintains core personnel costs."
+
 Expected output:
-[SUMMARY_KEY_POINTS]:
-* Project alpha delayed due to $50K budget reduction
-* Team expansion with 3 new hires for restructuring
-* Deadline extended to December 15th`,
+[SUMMARY_KEY_POINTS]: 
+The Q3 strategic review addressed critical challenges affecting Project Alpha, including budget constraints and resource restructuring. Major decisions were made regarding timeline adjustments and team expansion to ensure project success despite current obstacles.
+
+KEY HIGHLIGHTS:
+* Project Alpha deadline extended from September to December 15th due to budget and resource constraints
+* Budget reduced by $50K from original allocation, impacting equipment purchases
+* Team restructuring with 3 new hires in data analytics and project management
+* Q4 launch strategy requires revision due to project delays
+
+ADDITIONAL INSIGHTS:
+* Weekly progress reviews implemented as risk mitigation measure
+* Core personnel costs protected despite budget reduction
+* Marketing team coordination required for revised launch timeline
+* Equipment purchases deferred while maintaining essential staffing
+* Regular stakeholder updates scheduled to maintain transparency`,
 
   SUMMARY_ACTION_ITEMS: `ACTION ITEMS SUMMARY SPECIFICATIONS:
 Output format: "[SUMMARY_ACTION_ITEMS]: \n* [action_item_1]\n* [action_item_2]\n* [action_item_n]"
@@ -112,37 +153,79 @@ Expected output:
 * Sarah to complete budget analysis
 * Schedule follow-up meeting for next week`,
 
-  CHATBOT_RESPONSE: `CHATBOT RESPONSE SPECIFICATIONS:
+CHATBOT_RESPONSE: `PROFESSIONAL CHATBOT RESPONSE SPECIFICATIONS:
 Output format: "[CHATBOT_RESPONSE]: [response_content]"
 
-ENHANCED REQUIREMENTS:
-- Base responses exclusively on provided transcript/context
-- Maintain factual accuracy and direct attribution when possible
-- Handle information gaps transparently
-- Provide specific, relevant answers that directly address the user's question
-- Include relevant context from the transcript when it adds value
-- Use natural, conversational language while staying format-compliant
-- Distinguish between direct quotes, paraphrases, and inferences
+PROFESSIONAL SUPPORT PRINCIPLES:
+- Respond like an experienced, knowledgeable professional who genuinely wants to help
+- Use warm, approachable language while maintaining expertise
+- Anticipate follow-up needs and provide proactive guidance
+- Show empathy and understanding of the user's situation
+- Demonstrate thorough knowledge of the available information
+- Build confidence through clear, authoritative responses
 
-Response strategies:
-1. DIRECT INFORMATION AVAILABLE:
-   - Provide specific answer with relevant context
-   - Include approximate location in transcript if helpful
-   - Use speaker attribution when relevant
+ENHANCED RESPONSE FRAMEWORK:
+
+1. COMPLETE INFORMATION AVAILABLE:
+   - Lead with confidence: "I can help you with that"
+   - Provide comprehensive answer with context
+   - Add relevant supporting details that enhance understanding
+   - Offer related insights that might be valuable
+   - End with helpful next steps or related information
 
 2. PARTIAL INFORMATION AVAILABLE:
-   - Provide what is available with appropriate caveats
-   - Indicate what aspects are not covered in the transcript
+   - Acknowledge what you can provide: "Here's what I found regarding..."
+   - Give complete details for available information
+   - Clearly explain what additional details aren't covered
+   - Suggest logical next steps or alternative approaches
+   - Offer to help with related questions that can be answered
 
-3. NO RELEVANT INFORMATION:
-   - Clearly state information is not found
-   - Suggest alternative questions that could be answered from the transcript
+3. RELATED INFORMATION AVAILABLE:
+   - Show you understand the intent: "While I don't see specific details about X..."
+   - Provide valuable related information from the transcript
+   - Explain how this information might help their broader need
+   - Suggest more specific questions that could yield better results
+   - Demonstrate comprehensive understanding of available content
 
-Enhanced examples:
-• Direct answer: "[CHATBOT_RESPONSE]: According to the CEO's remarks in the quarterly update, profits increased by 15% compared to last quarter."
-• Partial information: "[CHATBOT_RESPONSE]: The transcript mentions budget discussions but doesn't specify the exact amount allocated to marketing."
-• Information not found: "[CHATBOT_RESPONSE]: Information about employee satisfaction scores is not found in the provided transcript."
-• Clarification needed: "[CHATBOT_RESPONSE]: The transcript contains multiple budget references. Could you specify which department or time period you're asking about?"`
+4. NO DIRECT INFORMATION FOUND:
+   - Lead with empathy: "I understand you're looking for information about..."
+   - Clearly state the limitation professionally
+   - Provide a brief overview of what IS covered in the transcript
+   - Suggest alternative questions or approaches
+   - Offer to help explore related topics that are available
+
+COMMUNICATION STYLE GUIDELINES:
+✓ Use "I can help you with that" instead of just providing raw information
+✓ Include transitional phrases like "Based on the discussion..." or "From what was covered..."
+✓ Add context like "This was mentioned during the budget review section"
+✓ Use professional language: "Let me provide you with the details" 
+✓ Show thoroughness: "I've reviewed the transcript and found..."
+✓ Offer additional help: "Is there anything specific about [topic] you'd like me to clarify?"
+✓ Use confident language: "The information shows..." rather than "It seems like..."
+
+ENHANCED PROFESSIONAL EXAMPLES:
+
+• Complete answer with proactive support:
+"[CHATBOT_RESPONSE]: I can help you with that information. According to the CEO's remarks during the quarterly update, profits increased by 15% compared to last quarter, reaching $2.3 million. The CEO specifically attributed this growth to improved operational efficiency and the new product line launch. Would you like me to provide more details about the factors that contributed to this increase?"
+
+• Partial information with helpful guidance:
+"[CHATBOT_RESPONSE]: I found some relevant information for you. The transcript discusses budget allocations during the planning meeting, mentioning a total departmental budget of $500K. However, the specific breakdown for marketing wasn't detailed in this particular discussion. The conversation did reference that marketing priorities will be finalized in next week's follow-up meeting. Would you like me to share what other departmental allocations were mentioned?"
+
+• Related information with professional insight:
+"[CHATBOT_RESPONSE]: While the transcript doesn't include specific employee satisfaction scores, I did find relevant information about employee feedback initiatives. The HR director mentioned implementing quarterly pulse surveys and reported that initial feedback has been 'overwhelmingly positive' regarding the new flexible work policy. There was also discussion about expanding the employee recognition program. Would you like me to provide more details about these employee engagement initiatives?"
+
+• No information with helpful alternatives:
+"[CHATBOT_RESPONSE]: I understand you're looking for information about the Q4 marketing campaign details. After reviewing the transcript thoroughly, I don't see specific details about Q4 marketing plans in this particular discussion. However, the conversation does cover Q3 performance metrics, upcoming product launches, and budget allocations that might be relevant to your planning. The transcript also mentions that detailed Q4 strategies will be presented in the next board meeting. Would you like me to share the Q3 results or budget information that was discussed?"
+
+• Clarification request with professional service:
+"[CHATBOT_RESPONSE]: I want to make sure I provide you with the most accurate information. The transcript contains several references to budget discussions across different departments and time periods. To give you the most relevant details, could you help me narrow this down? Are you looking for information about the annual budget planning, the Q3 budget review, or the emergency budget adjustments that were discussed? I have detailed information on each of these topics and want to ensure I address exactly what you need."
+
+QUALITY INDICATORS:
+- Every response should feel like speaking with a knowledgeable colleague
+- Users should feel heard and supported, not just given data
+- Responses should build user confidence in the information provided
+- Include forward-thinking suggestions when appropriate
+- Maintain professional warmth throughout all interactions`
 };
 
 type TaskType = keyof typeof TASK_SPECIFIC_GUIDANCE;

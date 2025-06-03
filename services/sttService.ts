@@ -1,15 +1,53 @@
-
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
-import { GEMINI_MODEL_TEXT, SUPPORTED_LANGUAGES } from '../constants'; // Assuming SUPPORTED_LANGUAGES might be useful for language name mapping if needed for prompts
+import { GEMINI_MODEL_TEXT, SUPPORTED_LANGUAGES } from '../constants';
 
-const API_KEY = process.env.API_KEY;
+// Thay thế API_KEY cũ bằng Key Rotator
+class GeminiKeyRotator {
+  private apiKeys: string[];
+  private currentKeyIndex = 0;
+  private keyStates: { exhaustedUntil?: number }[];
+
+  constructor(apiKeys: string[]) {
+    this.apiKeys = apiKeys;
+    this.keyStates = apiKeys.map(() => ({}));
+  }
+
+  getNextKey(): string | null {
+    const now = Date.now();
+    for (let i = 0; i < this.apiKeys.length; i++) {
+      const idx = (this.currentKeyIndex + i) % this.apiKeys.length;
+      const state = this.keyStates[idx];
+      if (!state.exhaustedUntil || state.exhaustedUntil < now) {
+        this.currentKeyIndex = (idx + 1) % this.apiKeys.length;
+        return this.apiKeys[idx];
+      }
+    }
+    return null;
+  }
+
+  markKeyExhausted(key: string, cooldownMs = 3600000) {
+    const index = this.apiKeys.indexOf(key);
+    if (index !== -1) {
+      this.keyStates[index] = { exhaustedUntil: Date.now() + cooldownMs };
+    }
+  }
+}
+
+// Khởi tạo rotator với nhiều API keys
+// const API_KEYS = process.env.API_KEYS?.split(',') || [];
+const API_KEYS = ['AIzaSyABy3VklRPeQjufLX9SC3gAyASdEHNgKUo','AIzaSyDec1jjpSRgSn0XTGg4ZicSGtqiNdsREtw','AIzaSyB1q7zpFPXJkKwjet4yolkIr9mGT_rsGbQ','AIzaSyAiudI6TqCUefpcF3J1TpYHFKnv658ZW0I']
+const keyRotator = new GeminiKeyRotator(API_KEYS);
 
 const getAiClient = () => {
-  if (!API_KEY) {
-    console.error("API_KEY for Gemini (STT Service) is not set. Please set the process.env.API_KEY environment variable.");
-    throw new Error("Gemini API Key is not configured for STT Service.");
+  const apiKey = keyRotator.getNextKey();
+  if (!apiKey) {
+    console.error("All API keys for Gemini (STT Service) are exhausted.");
+    throw new Error("All Gemini API Keys are currently unavailable.");
   }
-  return new GoogleGenAI({ apiKey: API_KEY });
+  return {
+    genAI: new GoogleGenAI({ apiKey }),
+    currentKey: apiKey
+  };
 };
 
 const MAX_RETRIES = 3;
@@ -18,7 +56,7 @@ const RETRY_DELAY_MS = 1000;
 const processAudioTranscriptionTask = async (
   base64AudioData: string,
   mimeType: string,
-  languageCode: string, // BCP-47 language code for STT hinting
+  languageCode: string,
   options?: {
     temperature?: number;
     maxOutputTokens?: number; 
@@ -26,7 +64,7 @@ const processAudioTranscriptionTask = async (
     topK?: number;
   }
 ): Promise<string> => {
-  const ai = getAiClient();
+  const { genAI, currentKey } = getAiClient();
   
   const audioPart = {
     inlineData: {
@@ -35,22 +73,18 @@ const processAudioTranscriptionTask = async (
     },
   };
 
-  // Construct a more specific prompt for transcription if languageCode is available
   const languageName = SUPPORTED_LANGUAGES.find(l => l.code.startsWith(languageCode.split('-')[0]))?.name || languageCode;
   let promptText = `Transcribe the following audio accurately.`;
   if (languageCode) {
     promptText += ` The audio is in ${languageName} (language code: ${languageCode}). Provide only the text of the transcription.`;
-  } else {
-    promptText += ` Provide only the text of the transcription.`;
   }
-  // Future: Add context or specific vocabulary hints if API supports more complex prompting for STT.
 
   const textPart = { text: promptText };
 
   let retries = 0;
   while (retries <= MAX_RETRIES) {
     try {
-      const response: GenerateContentResponse = await ai.models.generateContent({
+      const response: GenerateContentResponse = await genAI.models.generateContent({
         model: GEMINI_MODEL_TEXT, 
         contents: { parts: [audioPart, textPart] }, 
         config: {
@@ -61,10 +95,10 @@ const processAudioTranscriptionTask = async (
         }
       });
 
-      const transcribedText = response.text?.trim() ?? ''; 
+      const transcribedText = response.text?.trim() ?? '';
       
       if (transcribedText === '' && retries === 0) {
-        console.warn("STT Service: Gemini API returned an empty transcription on the first attempt. This might be due to silent/short audio, or a non-speech audio source.");
+        console.warn("STT Service: Gemini API returned an empty transcription on the first attempt.");
       }
       
       return transcribedText;
@@ -72,6 +106,11 @@ const processAudioTranscriptionTask = async (
     } catch (error) {
       const currentErrorMessage = (error as Error).message || "Unknown error";
       console.error(`STT Service: Gemini API audio transcription (attempt ${retries + 1}/${MAX_RETRIES + 1}) failed:`, error);
+      
+      // Nếu lỗi liên quan đến quota/rate limit, đánh dấu key hiện tại là exhausted
+      if (currentErrorMessage.includes('429') || currentErrorMessage.includes('quota') || currentErrorMessage.includes('limit')) {
+        keyRotator.markKeyExhausted(currentKey);
+      }
       
       retries++;
       if (retries > MAX_RETRIES) {
@@ -87,16 +126,13 @@ export const sttService = {
   transcribeAudio: async (
     base64AudioData: string,
     mimeType: string,
-    languageCode: string // BCP-47 language code, e.g., 'en-US', 'vi-VN'
+    languageCode: string
   ): Promise<string> => {
     try {
       return await processAudioTranscriptionTask(base64AudioData, mimeType, languageCode, { temperature: 0.25, topK: 40 });
     } catch (error) {
        console.error("STT Service: transcribeAudio error:", error);
        const finalErrorMessage = error instanceof Error ? error.message : String(error);
-       // For STT, if it fails, an empty string might be an acceptable fallback for a chunk rather than throwing and stopping all.
-       // However, for now, let's rethrow so App.tsx/audioService can decide how to handle.
-       // To return empty on error: return "";
        throw new Error(`STT Service: Failed to transcribe audio recording: ${finalErrorMessage}`);
     }
   }
