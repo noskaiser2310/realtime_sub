@@ -9,10 +9,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
     "@google/genai": "^1.2.0",
-    "bcryptjs": "^2.4.3"
+    "@react-pdf/renderer": "^4.3.0",
+    "bcryptjs": "^2.4.3",
+    "jspdf": "^3.0.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

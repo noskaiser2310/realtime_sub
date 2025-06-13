@@ -1,22 +1,56 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AudioControl } from '../components/AudioControl';
 import { TranscriptArea } from '../components/TranscriptArea';
 import { SummarySection } from '../components/SummarySection';
-// ErrorMessage is now handled by App.tsx's Toast system
 import { Chatbot } from '../components/Chatbot';
 import type { ChatMessage } from '../components/Chatbot';
 import { translateText, summarizeText, answerFromTranscript } from '../services/geminiService';
 import * as audioService from '../services/audioService';
 import * as ttsService from '../services/ttsService';
 import * as sessionService from '../services/sessionService';
-import type { MeetingSessionData } from '../services/sessionService'; // Updated type name
+import type { MeetingSessionData } from '../services/sessionService';
 import { RecordingState, SummaryType } from '../types';
 import type { LanguageOption, SummaryContent, AppSettings } from '../types';
 import { INITIAL_SUMMARY_CONTENT, SUPPORTED_LANGUAGES } from '../constants';
 import { MicIcon, DownloadIcon, BrainIcon, LanguagesIcon, ChatBubbleIcon, FileAudioIcon, VolumeUpIcon, EditIcon, UserCircleIcon, LogoutIcon, SaveIcon, CogIcon, ArchiveIcon, LoadIcon, TrashIcon, SettingsIcon, MicOffIcon } from '../components/icons/FeatureIcons';
 import { SpeakerOnIcon, SpeakerOffIcon, PlayIcon, StopIcon, PauseIcon } from '../components/icons/MediaIcons';
 import { LoadingSpinner } from '../LoadingSpinner';
+import { PDFDownloadLink } from '@react-pdf/renderer';
+
+// import { DocumentTextIcon } from '../components/icons/FeatureIcons'; // Một icon mới cho đẹp
+
+// ==================================================================
+// == BƯỚC 1: ĐỊNH NGHĨA CUSTOM HOOK useSmartScroll (CÔNG CỤ MỚI) ==
+// ==================================================================
+/**
+ * Một custom hook để tự động cuộn một phần tử xuống dưới cùng một cách thông minh.
+ * Nó chỉ cuộn khi người dùng đã ở gần cuối của vùng chứa.
+ * @param dependency - Mảng dữ liệu mà khi thay đổi sẽ kích hoạt kiểm tra cuộn (ví dụ: [messages]).
+ * @returns Một ref để gắn vào phần tử DOM có thể cuộn.
+ */
+export const useSmartScroll = (dependency: any[]): React.RefObject<HTMLDivElement> => {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Khoảng đệm (buffer) để tăng độ chính xác, phòng trường hợp có padding/margin
+    const scrollBuffer = 20; 
+
+    // Kiểm tra xem người dùng có đang ở gần đáy của vùng chứa hay không
+    const isScrolledToBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + scrollBuffer;
+
+    // Chỉ tự động cuộn xuống dưới cùng nếu người dùng ĐANG ở dưới cùng
+    if (isScrolledToBottom) {
+      container.scrollTop = container.scrollHeight;
+    }
+
+  }, [dependency]); // Chỉ chạy khi dependency thay đổi
+
+  return containerRef;
+};
+
 
 interface MainPageProps {
   userData: { name: string; id: string | null };
@@ -37,11 +71,12 @@ export const MainPage: React.FC<MainPageProps> = ({
 }) => {
   const [currentRecordingState, setCurrentRecordingState] = useState<RecordingState>(RecordingState.Idle);
   const [elapsedTime, setElapsedTime] = useState<number>(0);
-  
-  // Language and theme states initialized from appSettings props
+    const [isClient, setIsClient] = useState(false);
+
   const [sourceLanguage, setSourceLanguage] = useState<LanguageOption>(appSettings.sourceLanguage);
   const [targetLanguage, setTargetLanguage] = useState<LanguageOption>(appSettings.targetLanguage);
-  
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState<boolean>(false);
+
   const [meetingTranscript, setMeetingTranscript] = useState<string>('');
   const [editedTranscript, setEditedTranscript] = useState<string | null>(null);
   const [isEditingTranscript, setIsEditingTranscript] = useState<boolean>(false);
@@ -49,15 +84,12 @@ export const MainPage: React.FC<MainPageProps> = ({
   const [summary, setSummary] = useState<SummaryContent>(INITIAL_SUMMARY_CONTENT);
   const [chatbotMessages, setChatbotMessages] = useState<ChatMessage[]>([]);
   
-  // Error messages are now handled by showToast prop from App.tsx
   const [isUiLocked, setIsUiLocked] = useState<boolean>(false); 
   
   const [isGeminiSummaryLoading, setIsGeminiSummaryLoading] = useState<SummaryType | null>(null);
   const [isGeminiChatbotLoading, setIsGeminiChatbotLoading] = useState<boolean>(false);
   const [isGeminiTranslationLoading, setIsGeminiTranslationLoading] = useState<boolean>(false);
 
-  // Auto-speak per segment is removed. TTS is manual via "Speak All".
-  // const [autoSpeakTranslation, setAutoSpeakTranslation] = useState<boolean>(true); 
   const [canSpeakCurrentTargetLang, setCanSpeakCurrentTargetLang] = useState<boolean>(false);
   const [isTtsActive, setIsTtsActive] = useState<boolean>(false); 
   const [isTtsPaused, setIsTtsPaused] = useState<boolean>(false);
@@ -76,6 +108,11 @@ export const MainPage: React.FC<MainPageProps> = ({
   const micClarityHintRef = useRef<'low' | 'normal'>('normal');
   const micErrorRef = useRef<boolean>(false);
   const transcriptEditAreaRef = useRef<HTMLTextAreaElement>(null);
+  
+
+  const transcriptContainerRef = useSmartScroll([meetingTranscript]);
+  const translationContainerRef = useSmartScroll([fullTranslatedTranscript]);
+  const chatbotContainerRef = useSmartScroll([chatbotMessages]);
 
   // Sync language state with AppSettings when props change
     useEffect(() => {
@@ -858,3 +895,4 @@ export const MainPage: React.FC<MainPageProps> = ({
     </div>
   );
 };
+

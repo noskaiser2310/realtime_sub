@@ -7,6 +7,8 @@ interface TranscriptAreaProps {
   onEdit?: (newText: string) => void;
   textareaRef?: React.RefObject<HTMLTextAreaElement>;
   theme: ThemeType;
+  // Prop mới để nhận ref từ custom hook useSmartScroll
+  containerRef?: React.RefObject<HTMLDivElement>;
 }
 
 export const TranscriptArea: React.FC<TranscriptAreaProps> = ({ 
@@ -14,17 +16,11 @@ export const TranscriptArea: React.FC<TranscriptAreaProps> = ({
     isEditing = false, 
     onEdit,
     textareaRef,
-    theme
+    theme,
+    containerRef
 }) => {
-  const endOfContentRef = useRef<HTMLDivElement | null>(null);
   const localTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const currentTextareaRef = textareaRef || localTextareaRef;
-
-  useEffect(() => {
-    if (!isEditing && typeof content === 'string') {
-      endOfContentRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [content, isEditing]);
 
   const handleTextChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     if (onEdit) {
@@ -32,6 +28,7 @@ export const TranscriptArea: React.FC<TranscriptAreaProps> = ({
     }
   };
   
+  // useEffect này để tự động điều chỉnh chiều cao của textarea khi chỉnh sửa, vẫn hữu ích
   useEffect(() => {
     if (isEditing && currentTextareaRef.current) {
       currentTextareaRef.current.style.height = 'auto';
@@ -46,9 +43,11 @@ export const TranscriptArea: React.FC<TranscriptAreaProps> = ({
   const scrollbarThumb = theme === 'dark' ? 'scrollbar-thumb-slate-500' : 'scrollbar-thumb-slate-400';
   const scrollbarTrack = theme === 'dark' ? 'scrollbar-track-slate-600' : 'scrollbar-track-slate-200';
 
-
   return (
-    <div className={`h-80 p-4 rounded-lg overflow-y-auto flex flex-col ${bgColor} ${textColor} ${isEditing ? '' : 'justify-center'}`}>
+    <div 
+      ref={containerRef}
+      className={`h-80 p-4 rounded-lg overflow-y-auto flex flex-col ${bgColor} ${textColor} ${isEditing ? '' : 'justify-center'}`}
+    >
       {isEditing ? (
         <textarea
           ref={currentTextareaRef}
@@ -62,7 +61,6 @@ export const TranscriptArea: React.FC<TranscriptAreaProps> = ({
       ) : (
         <div className="flex items-center justify-center h-full">{content}</div>
       )}
-      {!isEditing && <div ref={endOfContentRef} />}
     </div>
   );
 };

@@ -14,17 +14,20 @@ interface ChatbotProps {
   onSendMessage: (message: string) => Promise<void>;
   isChatbotLoading: boolean;
   theme: ThemeType;
+  // Prop mới để nhận ref từ custom hook useSmartScroll
+  containerRef?: React.RefObject<HTMLDivElement>;
 }
 
-export const Chatbot: React.FC<ChatbotProps> = ({ chatMessages, onSendMessage, isChatbotLoading, theme }) => {
+export const Chatbot: React.FC<ChatbotProps> = ({ 
+    chatMessages, 
+    onSendMessage, 
+    isChatbotLoading, 
+    theme, 
+    containerRef 
+}) => {
   const [userInput, setUserInput] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages]);
 
   const handleInputChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     setUserInput(event.target.value);
@@ -69,10 +72,12 @@ export const Chatbot: React.FC<ChatbotProps> = ({ chatMessages, onSendMessage, i
   const scrollbarThumb = theme === 'dark' ? 'scrollbar-thumb-slate-500' : 'scrollbar-thumb-slate-400';
   const scrollbarTrack = theme === 'dark' ? 'scrollbar-track-slate-700' : 'scrollbar-track-slate-200';
 
-
   return (
     <div className={`flex flex-col h-[clamp(300px,60vh,500px)] rounded-lg shadow-md ${mainBgColor}`}>
-      <div className={`flex-grow p-4 overflow-y-auto space-y-3 scrollbar-thin ${scrollbarThumb} ${scrollbarTrack}`}>
+      <div 
+        ref={containerRef}
+        className={`flex-grow p-4 overflow-y-auto space-y-3 scrollbar-thin ${scrollbarThumb} ${scrollbarTrack}`}
+      >
         {chatMessages.length === 0 && !isChatbotLoading && !isSendingMessage && (
           <p className={`text-center italic ${infoTextColor}`}>Khi có nội dung phiên âm, bạn có thể hỏi về cuộc họp tại đây, kể cả khi đang ghi âm.</p>
         )}
@@ -104,7 +109,6 @@ export const Chatbot: React.FC<ChatbotProps> = ({ chatMessages, onSendMessage, i
              </div>
            </div>
         )}
-        <div ref={messagesEndRef} />
       </div>
       <form onSubmit={handleSubmit} className={`p-3 border-t rounded-b-lg flex items-start space-x-2 ${mainBgColor} ${theme === 'dark' ? 'border-slate-600' : 'border-slate-300'}`}>
         <textarea
