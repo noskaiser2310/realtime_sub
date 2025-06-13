@@ -164,11 +164,6 @@ Trang này chứa các tính năng cốt lõi của trợ lý cuộc họp:
 *   `bcryptjs` (dùng cho demo băm mật khẩu)
 *   API Trình duyệt (WebRTC, Web Audio, MediaRecorder, SpeechSynthesis, `localStorage`)
 
-## 10. Các cải tiến trong tương lai (Điểm nổi bật cho triển khai đầy đủ)
-
-*   **Backend An toàn:** Cần thiết cho việc xác thực người dùng đúng cách (OAuth, băm mật khẩu an toàn), quản lý API key, và lưu trữ dữ liệu liên tục (phiên họp, hồ sơ người dùng, cài đặt) trong cơ sở dữ liệu.
-*   **Phiên Người dùng Thực:** Quản lý phiên phía máy chủ (ví dụ: JWTs, cookies).
-*   Và các cải tiến khác đã đề cập trong README của phiên bản trước.
 
 
 
