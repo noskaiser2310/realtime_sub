@@ -10,6 +10,8 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { MainPage } from './pages/MainPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { Analytics } from '@vercel/analytics/react'; // <-- DÒNG 1: THÊM VÀO ĐÂY
+
 
 const App: React.FC = () => {
   const [appStatus, setAppStatus] = useState<AppStatusType>('initializing');
@@ -226,6 +228,7 @@ const App: React.FC = () => {
           <Toast key={toast.id} {...toast} onDismiss={dismissToast} />
         ))}
       </div>
+       <Analytics /> 
     </React.Fragment>
   );
 };
