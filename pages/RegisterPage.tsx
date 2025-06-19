@@ -41,6 +41,10 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onAuthSuccess, showT
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const handleGoToHomepage = () => {
+    window.location.hash = '';
+  };
+
   const validateForm = (): boolean => {
     if (username.trim().length < 3) {
       setError('Tên đăng nhập phải có ít nhất 3 ký tự.');
@@ -160,6 +164,15 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onAuthSuccess, showT
             Đăng nhập
           </button>
         </p>
+        <div className="text-center mt-4">
+          <button
+            onClick={handleGoToHomepage}
+            className="w-full max-w-xs mx-auto bg-slate-600 hover:bg-slate-500 text-slate-200 font-medium py-2.5 px-4 rounded-lg shadow-sm transition duration-150 ease-in-out"
+            aria-label="Về Trang Chủ"
+          >
+            Về Trang Chủ
+          </button>
+        </div>
       </div>
        <footer className="mt-8 text-center text-slate-500 text-xs">
         &copy; {new Date().getFullYear()} Real-time Meeting Assistant.

@@ -1,3 +1,4 @@
+
 export enum RecordingState {
   Idle = 'idle',
   Initializing = 'initializing', // New: Streams are being acquired
@@ -30,10 +31,6 @@ export interface MediaRecorderOptionsPolyfill {
     audioBitrateMode?: "constant" | "variable";
 }
 
-// SpeechSynthesisVoice interface is no longer needed in types.ts
-// as ttsService.ts handles voice objects internally.
-// App.tsx primarily relies on ttsService.isLanguageSupported(langCode).
-
 // New types for routing and app structure
 export type RouteType = 'login' | 'register' | 'main' | 'settings';
 
@@ -59,3 +56,6 @@ export interface AppSettings {
   targetLanguage: LanguageOption;
   // Add other settings as needed
 }
+
+// Type for new Action Panel tabs in MainPage
+export type ActionTabType = 'summary' | 'actionItems' | 'qa';

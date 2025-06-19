@@ -1,79 +1,481 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Real-time Meeting Assistant</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@^19.1.0",
-    "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
-    "react/": "https://esm.sh/react@^19.1.0/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.2.0",
-    "bcryptjs": "https://esm.sh/bcryptjs@^2.4.3",
-    "@/App": "./App.tsx"
-  }
-}
-</script>
-<style>
-  .fullscreen-loader {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    background-color: #1a202c; /* bg-slate-800 */
-    color: #e2e8f0; /* text-slate-200 */
-  }
-  .fullscreen-loader p {
-    margin-top: 1rem;
-    font-size: 1.125rem; /* text-lg */
-  }
-  /* Basic Toast Styling */
-  .toast-container {
-    position: fixed;
-    top: 1.25rem; /* top-5 */
-    right: 1.25rem; /* right-5 */
-    z-index: 50;
-  }
-  .toast {
-    padding: 0.75rem 1rem; /* py-3 px-4 */
-    border-radius: 0.5rem; /* rounded-lg */
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-lg */
-    margin-bottom: 0.5rem;
-    color: white;
-    opacity: 0;
-    transform: translateX(100%);
-    animation: toast-slide-in 0.5s forwards, toast-fade-out 0.5s 2.5s forwards;
-  }
-  .toast.success { background-color: #48bb78; /* bg-green-500 */ }
-  .toast.error { background-color: #f56565; /* bg-red-500 */ }
-  .toast.info { background-color: #4299e1; /* bg-blue-500 */ }
+<html lang="vi" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trợ Lý Cuộc Họp AI - Ghi Âm, Phiên Âm, Tóm Tắt</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Font chữ Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Thư viện icon Lucide -->
+  <script src="https://unpkg.com/lucide@latest"></script>
 
-  @keyframes toast-slide-in {
-    to {
-      opacity: 1;
-      transform: translateX(0);
+  <script type="importmap">
+  {
+    "imports": {
+      "react": "https://esm.sh/react@^19.1.0",
+      "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
+      "react/": "https://esm.sh/react@^19.1.0/",
+      "@google/genai": "https://esm.sh/@google/genai@^1.2.0",
+      "bcryptjs": "https://esm.sh/bcryptjs@^2.4.3",
+      "@/App": "./App.tsx",
+      "@react-pdf/renderer": "https://esm.sh/@react-pdf/renderer@^4.3.0"
     }
   }
-  @keyframes toast-fade-out {
-    from {
-      opacity: 1;
-      transform: translateX(0);
+  </script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
-    to {
+    .gradient-text {
+      background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .video-thumbnail::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.3);
+        border-radius: 1rem; /* consistent with image rounding */
+        transition: background 0.3s ease;
+    }
+    .video-thumbnail:hover::before {
+        background: rgba(0,0,0,0.1);
+    }
+    /* Styles from old index.html for React app specifics */
+    .fullscreen-loader {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh; /* Will apply within its container */
+      background-color: #1a202c; /* bg-slate-800 */
+      color: #e2e8f0; /* text-slate-200 */
+    }
+    .fullscreen-loader p {
+      margin-top: 1rem;
+      font-size: 1.125rem; /* text-lg */
+    }
+    .toast-container {
+      position: fixed;
+      top: 1.25rem; /* top-5 */
+      right: 1.25rem; /* right-5 */
+      z-index: 100; /* Ensure toast is above dashboard elements */
+    }
+    .toast {
+      padding: 0.75rem 1rem; /* py-3 px-4 */
+      border-radius: 0.5rem; /* rounded-lg */
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-lg */
+      margin-bottom: 0.5rem;
+      color: white;
       opacity: 0;
       transform: translateX(100%);
+      animation: toast-slide-in 0.5s forwards, toast-fade-out 0.5s 2.5s forwards;
     }
-  }
-</style>
-<link rel="stylesheet" href="/index.css">
+    .toast.success { background-color: #48bb78; /* bg-green-500 */ }
+    .toast.error { background-color: #f56565; /* bg-red-500 */ }
+    .toast.info { background-color: #4299e1; /* bg-blue-500 */ }
+
+    @keyframes toast-slide-in {
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+    @keyframes toast-fade-out {
+      from {
+        opacity: 1;
+        transform: translateX(0);
+      }
+      to {
+        opacity: 0;
+        transform: translateX(100%);
+      }
+    }
+    /* Ensure React root takes available space within dashboard main area */
+    #root {
+        width: 100%;
+        height: 100%; /* Or min-height if content dictates */
+        display: flex; /* To make App.tsx's fullscreen loader work well */
+        flex-direction: column;
+    }
+  </style>
 </head>
-  <body class="bg-slate-900">
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
-  </body>
+<body class="bg-white">
+
+  <!-- ======================================================= -->
+  <!-- Phần 1: TRANG CHỦ (HOMEPAGE)                           -->
+  <!-- ======================================================= -->
+  <div id="homepage-section">
+    <!-- Header -->
+    <header class="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-md shadow-sm z-50">
+      <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+        <div class="text-2xl font-bold gradient-text">Trợ Lý AI</div>
+        <nav class="hidden md:flex items-center space-x-8">
+          <a href="#features" class="text-gray-600 hover:text-blue-600 font-medium">Tính Năng</a>
+          <a href="#demo-video" class="text-gray-600 hover:text-blue-600 font-medium">Xem Demo</a>
+          <a href="#pricing" class="text-gray-600 hover:text-blue-600 font-medium">Bảng Giá</a>
+        </nav>
+        <div>
+          <button id="header-login-btn" class="hidden md:inline-block text-gray-700 font-semibold mr-4">Đăng Nhập</button>
+          <button id="header-register-dashboard-btn" class="bg-blue-600 text-white font-semibold px-5 py-2.5 rounded-lg shadow-lg hover:bg-blue-700 transition-all">
+            Đăng Ký
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="pt-20">
+      <!-- Hero Section -->
+      <section class="text-center py-20 lg:py-32 px-6 bg-gray-50">
+        <div class="container mx-auto">
+          <h1 class="text-4xl md:text-6xl font-extrabold text-gray-900 leading-tight">
+            Giải Phóng Bạn Khỏi Việc Ghi Chép,
+            <br>
+            <span class="gradient-text">Tập Trung Vào Điều Quan Trọng</span>
+          </h1>
+          <p class="mt-6 text-lg md:text-xl text-gray-600 max-w-3xl mx-auto">
+            Trợ lý AI tự động ghi âm, phiên âm, dịch và tóm tắt mọi cuộc họp. Giúp bạn không bao giờ bỏ lỡ bất kỳ thông tin quan trọng nào.
+          </p>
+          <div class="mt-10">
+            <button id="hero-cta-btn" class="bg-blue-600 text-white font-bold px-8 py-4 rounded-lg shadow-xl hover:bg-blue-700 transform hover:scale-105 transition-all">
+              Bắt Đầu Miễn Phí Ngay
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Video Demo Section -->
+      <section id="demo-video" class="py-20 px-6">
+        <div class="container mx-auto">
+          <div class="text-center mb-12">
+            <h2 class="text-3xl md:text-4xl font-bold text-gray-900">Xem Trợ Lý AI hoạt động chỉ trong 2 phút</h2>
+            <p class="mt-4 text-lg text-gray-600">Trải nghiệm sức mạnh của AI trong việc biến đổi các cuộc họp của bạn.</p>
+          </div>
+          <div class="max-w-4xl mx-auto">
+            <div class="aspect-video bg-gray-900 rounded-2xl shadow-2xl overflow-hidden relative group video-thumbnail cursor-pointer" onclick="alert('Video player placeholder: Integrate your video here!')">
+              <img src="https://placehold.co/1280x720/111827/ffffff?text=Video+Demo" alt="Video demo sản phẩm" class="w-full h-full object-cover">
+              <div class="absolute inset-0 flex items-center justify-center">
+                <button class="bg-white/90 text-blue-600 p-6 rounded-full shadow-lg transform group-hover:scale-110 transition-transform">
+                  <i data-lucide="play" class="w-12 h-12 fill-blue-600 ml-1"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Features Section -->
+      <section id="features" class="py-20 px-6 bg-gray-50">
+        <div class="container mx-auto">
+          <div class="text-center mb-16">
+            <h2 class="text-3xl md:text-4xl font-bold text-gray-900">Mọi thứ bạn cần cho một cuộc họp hiệu quả</h2>
+            <p class="mt-4 text-lg text-gray-600">Nền tảng tất cả trong một giúp bạn tiết kiệm thời gian và công sức.</p>
+          </div>
+          <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
+              <i data-lucide="mic" class="w-10 h-10 text-blue-600 mb-4"></i>
+              <h3 class="text-xl font-bold text-gray-800">Phiên Âm Chính Xác</h3>
+              <p class="mt-2 text-gray-600">Chuyển đổi giọng nói thành văn bản với độ chính xác cao, hỗ trợ nhiều ngôn ngữ.</p>
+            </div>
+            <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
+              <i data-lucide="languages" class="w-10 h-10 text-blue-600 mb-4"></i>
+              <h3 class="text-xl font-bold text-gray-800">Dịch Thuật Tức Thời</h3>
+              <p class="mt-2 text-gray-600">Phá bỏ rào cản ngôn ngữ với tính năng dịch trực tiếp sang hơn 50 ngôn ngữ.</p>
+            </div>
+            <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
+              <i data-lucide="file-text" class="w-10 h-10 text-blue-600 mb-4"></i>
+              <h3 class="text-xl font-bold text-gray-800">Tóm Tắt Thông Minh</h3>
+              <p class="mt-2 text-gray-600">AI tự động tạo tóm tắt, rút ra các điểm chính và các mục cần hành động.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      <!-- Pricing Section -->
+      <section id="pricing" class="py-20 px-6">
+        <div class="container mx-auto">
+           <div class="text-center mb-16">
+            <h2 class="text-3xl md:text-4xl font-bold text-gray-900">Bảng giá đơn giản, minh bạch</h2>
+            <p class="mt-4 text-lg text-gray-600">Chọn gói phù hợp nhất với nhu cầu của bạn.</p>
+          </div>
+          <div class="grid lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            <div class="border rounded-xl p-8 bg-white">
+              <h3 class="text-xl font-bold">Cá Nhân</h3>
+              <p class="text-4xl font-extrabold mt-4">$10<span class="text-lg font-medium text-gray-500">/tháng</span></p>
+              <ul class="mt-6 space-y-4 text-gray-600">
+                <li class="flex items-center"><i data-lucide="check-circle-2" class="w-5 h-5 text-green-500 mr-2"></i> 600 phút phiên âm/tháng</li>
+                <li class="flex items-center"><i data-lucide="check-circle-2" class="w-5 h-5 text-green-500 mr-2"></i> Tóm tắt & Phân tích AI</li>
+                <li class="flex items-center"><i data-lucide="check-circle-2" class="w-5 h-5 text-green-500 mr-2"></i> Xuất file đa dạng</li>
+              </ul>
+              <button id="pricing-personal-btn" class="w-full mt-8 bg-gray-200 text-gray-800 font-semibold py-3 rounded-lg hover:bg-gray-300">Bắt đầu</button>
+            </div>
+            <div class="border-2 border-blue-600 rounded-xl p-8 bg-white shadow-2xl relative">
+              <p class="absolute top-0 -translate-y-1/2 bg-blue-600 text-white px-4 py-1 rounded-full text-sm font-semibold">Phổ biến nhất</p>
+              <h3 class="text-xl font-bold">Đội Nhóm</h3>
+              <p class="text-4xl font-extrabold mt-4">$25<span class="text-lg font-medium text-gray-500">/người/tháng</span></p>
+              <ul class="mt-6 space-y-4 text-gray-600">
+                <li class="flex items-center"><i data-lucide="check-circle-2" class="w-5 h-5 text-green-500 mr-2"></i> Mọi thứ trong gói Cá Nhân</li>
+                <li class="flex items-center"><i data-lucide="check-circle-2" class="w-5 h-5 text-green-500 mr-2"></i> Không gian làm việc chung</li>
+                <li class="flex items-center"><i data-lucide="check-circle-2" class="w-5 h-5 text-green-500 mr-2"></i> Tích hợp Google Meet, Zoom</li>
+              </ul>
+              <button onclick="handleLoginRegisterClick('register')" class="w-full mt-8 bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700">Chọn Gói Team</button>
+            </div>
+            <div class="border rounded-xl p-8 bg-white">
+              <h3 class="text-xl font-bold">Doanh Nghiệp</h3>
+              <p class="text-4xl font-extrabold mt-4">Liên Hệ</p>
+              <ul class="mt-6 space-y-4 text-gray-600">
+                <li class="flex items-center"><i data-lucide="check-circle-2" class="w-5 h-5 text-green-500 mr-2"></i> Mọi thứ trong gói Đội Nhóm</li>
+                <li class="flex items-center"><i data-lucide="check-circle-2" class="w-5 h-5 text-green-500 mr-2"></i> Bảo mật nâng cao (SSO)</li>
+                <li class="flex items-center"><i data-lucide="check-circle-2" class="w-5 h-5 text-green-500 mr-2"></i> Hỗ trợ chuyên biệt</li>
+              </ul>
+              <button onclick="alert('Please contact our sales team for enterprise solutions.')" class="w-full mt-8 bg-gray-200 text-gray-800 font-semibold py-3 rounded-lg hover:bg-gray-300">Liên Hệ Sales</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Footer -->
+      <footer class="bg-gray-800 text-white">
+        <div class="container mx-auto px-6 py-12 text-center">
+            <p>&copy; ${new Date().getFullYear()} Trợ Lý AI. Mọi quyền được bảo lưu.</p>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+
+  <!-- ======================================================= -->
+  <!-- Phần 2: BẢNG ĐIỀU KHIỂN (DASHBOARD)                     -->
+  <!-- ======================================================= -->
+  <div id="dashboard-section" class="hidden">
+    <div class="flex h-screen bg-gray-50">
+      <aside id="dashboard-sidebar" class="w-20 lg:w-64 bg-white shadow-lg flex flex-col flex-shrink-0 transition-all duration-300 hidden">
+        <div class="h-16 flex items-center justify-center p-4 border-b border-gray-200">
+          <div class="w-8 h-8 rounded-lg bg-blue-600 lg:hidden"></div>
+          <h1 class="hidden lg:block text-2xl font-bold gradient-text">Trợ Lý AI</h1>
+        </div>
+        <nav class="flex-1 p-2 lg:p-4 space-y-2">
+          <a id="sidebar-new-meeting" href="javascript:void(0)" onclick="handleNewMeetingClick()" class="flex items-center justify-center lg:justify-start px-3 py-3 rounded-lg transition-all transform active:scale-95">
+            <i data-lucide="plus-circle" class="w-6 h-6"></i><span class="hidden lg:inline ml-3">Cuộc Họp Mới</span>
+          </a>
+          <a id="sidebar-history" href="javascript:void(0)" onclick="callAppNavigate('main', true, { showSavedSessions: true })" class="flex items-center justify-center lg:justify-start px-3 py-3 rounded-lg transition-all transform active:scale-95">
+            <i data-lucide="history" class="w-6 h-6"></i><span class="hidden lg:inline ml-3">Lịch Sử Họp</span>
+          </a>
+          <a id="sidebar-settings" href="javascript:void(0)" onclick="callAppNavigate('settings')" class="flex items-center justify-center lg:justify-start px-3 py-3 rounded-lg transition-all transform active:scale-95">
+            <i data-lucide="settings" class="w-6 h-6"></i><span class="hidden lg:inline ml-3">Cài Đặt</span>
+          </a>
+        </nav>
+        <div class="p-2 lg:p-4 border-t border-gray-200">
+          <a href="javascript:void(0)" onclick="handleLogout()" class="flex items-center justify-center lg:justify-start w-full px-3 py-3 text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg font-medium transition-all transform active:scale-95">
+             <i data-lucide="log-out" class="w-6 h-6"></i><span class="hidden lg:inline ml-3">Đăng Xuất</span>
+          </a>
+          <a href="javascript:void(0)" onclick="explicitlyShowHomepage()" class="flex items-center justify-center lg:justify-start w-full px-3 py-3 text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-lg font-medium transition-all mt-2 transform active:scale-95">
+             <i data-lucide="home" class="w-6 h-6"></i><span class="hidden lg:inline ml-3">Về Trang Chủ</span>
+          </a>
+        </div>
+      </aside>
+      <main class="flex-1 overflow-y-auto">
+        <!-- React App will mount here -->
+        <div id="root" class="h-full"> {/* Removed padding from root to let App.tsx control it */}
+            <!-- Initial static content, will be replaced by React -->
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <noscript>You need to enable JavaScript to run this app.</noscript>
+  <script type="module" src="/index.tsx"></script>
+
+  <script>
+    lucide.createIcons();
+    const homepageSection = document.getElementById('homepage-section');
+    const dashboardSection = document.getElementById('dashboard-section');
+    const dashboardSidebar = document.getElementById('dashboard-sidebar');
+
+    const sidebarLinks = {
+        newMeeting: document.getElementById('sidebar-new-meeting'),
+        history: document.getElementById('sidebar-history'),
+        settings: document.getElementById('sidebar-settings')
+    };
+    const activeSidebarClass = 'bg-blue-600 text-white shadow-lg font-semibold';
+    const inactiveSidebarClass = 'text-gray-600 hover:bg-blue-100 hover:text-blue-700 font-medium';
+    const baseSidebarClass = 'flex items-center justify-center lg:justify-start px-3 py-3 rounded-lg transition-all transform active:scale-95';
+
+    // Homepage button elements
+    const headerLoginBtn = document.getElementById('header-login-btn');
+    const headerRegisterDashboardBtn = document.getElementById('header-register-dashboard-btn');
+    const heroCtaBtn = document.getElementById('hero-cta-btn');
+    const pricingPersonalBtn = document.getElementById('pricing-personal-btn');
+
+
+    function showHomepage() {
+      if (homepageSection) homepageSection.classList.remove('hidden');
+      if (dashboardSection) dashboardSection.classList.add('hidden');
+      if (dashboardSidebar) dashboardSidebar.classList.add('hidden'); 
+    }
+
+    function showDashboard() {
+      if (homepageSection) homepageSection.classList.add('hidden');
+      if (dashboardSection) dashboardSection.classList.remove('hidden');
+      // Sidebar visibility is handled by handleRouteOrAuthChange based on auth state
+    }
+    
+    function updateHomepageHeader() {
+        const isAuthenticated = window.MyMeetingAppHandle && window.MyMeetingAppHandle.isAuthenticated && window.MyMeetingAppHandle.isAuthenticated();
+        const userName = isAuthenticated && window.MyMeetingAppHandle.getCurrentUserName ? window.MyMeetingAppHandle.getCurrentUserName() : '';
+
+        if (headerLoginBtn) {
+            if (isAuthenticated) {
+                headerLoginBtn.textContent = `Chào, ${userName}!`;
+                headerLoginBtn.onclick = () => callAppNavigate('settings');
+            } else {
+                headerLoginBtn.textContent = 'Đăng Nhập';
+                headerLoginBtn.onclick = () => handleLoginRegisterClick('login');
+            }
+        }
+
+        if (headerRegisterDashboardBtn) {
+            if (isAuthenticated) {
+                headerRegisterDashboardBtn.textContent = 'Bảng Điều Khiển';
+                headerRegisterDashboardBtn.onclick = () => callAppNavigate('main');
+            } else {
+                headerRegisterDashboardBtn.textContent = 'Đăng Ký';
+                headerRegisterDashboardBtn.onclick = () => handleLoginRegisterClick('register');
+            }
+        }
+
+        if (heroCtaBtn) {
+            if (isAuthenticated) {
+                heroCtaBtn.onclick = () => callAppNavigate('main');
+            } else {
+                heroCtaBtn.onclick = () => handleLoginRegisterClick('register');
+            }
+        }
+
+        if (pricingPersonalBtn) {
+            if (isAuthenticated) {
+                pricingPersonalBtn.onclick = () => callAppNavigate('main');
+                pricingPersonalBtn.classList.remove('bg-gray-200', 'text-gray-800', 'hover:bg-gray-300');
+                pricingPersonalBtn.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+            } else {
+                pricingPersonalBtn.onclick = () => handleLoginRegisterClick('register');
+                pricingPersonalBtn.classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+                pricingPersonalBtn.classList.add('bg-gray-200', 'text-gray-800', 'hover:bg-gray-300');
+            }
+        }
+    }
+    
+    function handleRouteOrAuthChange() {
+        const hash = window.location.hash;
+        const isDashboardRouteTarget = hash.startsWith('#/') && 
+                                   ['login', 'register', 'main', 'settings'].some(r => hash.substring(2).startsWith(r));
+
+        if (isDashboardRouteTarget) {
+            showDashboard();
+            if (window.MyMeetingAppHandle && window.MyMeetingAppHandle.isAuthenticated && dashboardSidebar) {
+                if (window.MyMeetingAppHandle.isAuthenticated()) {
+                    dashboardSidebar.classList.remove('hidden');
+                } else {
+                    dashboardSidebar.classList.add('hidden');
+                }
+            } else if (dashboardSidebar) {
+                 dashboardSidebar.classList.add('hidden'); 
+            }
+        } else { 
+            showHomepage(); 
+        }
+
+        updateHomepageHeader(); // Always update homepage header based on auth state
+
+        // Update active state for sidebar links
+        Object.values(sidebarLinks).forEach(link => {
+            if (link) {
+              link.className = `${baseSidebarClass} ${inactiveSidebarClass}`;
+            }
+        });
+
+        if (isDashboardRouteTarget && dashboardSidebar && !dashboardSidebar.classList.contains('hidden')) {
+            const hashPage = hash.substring(2).split('?')[0]; 
+            if (hashPage.startsWith('main')) {
+                if(hash.includes('showSavedSessions=true')) {
+                    if (sidebarLinks.history) sidebarLinks.history.className = `${baseSidebarClass} ${activeSidebarClass}`;
+                    if (sidebarLinks.newMeeting) sidebarLinks.newMeeting.className = `${baseSidebarClass} ${inactiveSidebarClass}`;
+                } else {
+                    if (sidebarLinks.newMeeting) sidebarLinks.newMeeting.className = `${baseSidebarClass} ${activeSidebarClass}`;
+                    if (sidebarLinks.history) sidebarLinks.history.className = `${baseSidebarClass} ${inactiveSidebarClass}`;
+                }
+            } else if (hashPage.startsWith('settings')) {
+                if (sidebarLinks.settings) sidebarLinks.settings.className = `${baseSidebarClass} ${activeSidebarClass}`;
+            }
+        }
+    }
+
+    function handleLoginRegisterClick(defaultRoute) {
+        showDashboard(); 
+        callAppNavigate(defaultRoute, true);
+    }
+    
+    function handleNewMeetingClick() {
+      callAppNavigate('main', true, { resetMainPage: true });
+    }
+
+    function callAppNavigate(route, replace = false, options = {}) { 
+      if (window.MyMeetingAppHandle && window.MyMeetingAppHandle.navigateToRoute) {
+        window.MyMeetingAppHandle.navigateToRoute(route, replace, options);
+      } else {
+        console.warn('Meeting app navigate function not available. Setting hash manually.');
+        const newHash = `#/${route}${options.showSavedSessions ? '?showSavedSessions=true' : ''}`;
+        if(replace) {
+            window.location.replace(newHash);
+        } else {
+            window.location.hash = newHash;
+        }
+        if (!window.MyMeetingAppHandle) handleRouteOrAuthChange();
+      }
+    }
+    
+    function handleLogout() { 
+        if (window.MyMeetingAppHandle && window.MyMeetingAppHandle.logout) {
+            window.MyMeetingAppHandle.logout(); // App.tsx will handle redirect to homepage
+        } else {
+            console.warn('Meeting app logout function not available. Basic cleanup.');
+            localStorage.removeItem('meetingAssistantUser'); 
+            explicitlyShowHomepage(); // Manually redirect and update UI
+        }
+    }
+
+    function explicitlyShowHomepage() {
+        if (window.location.hash !== '' && window.location.hash !== '#') {
+            window.history.pushState("", document.title, window.location.pathname + window.location.search); // Clears hash without jump
+            handleRouteOrAuthChange(); // Manually trigger because hashchange might not fire
+        } else {
+             showHomepage(); 
+             updateHomepageHeader(); // Ensure header is correct
+        }
+    }
+    
+    window.addEventListener('hashchange', handleRouteOrAuthChange);
+    
+    // Initial call to set up view based on current URL
+    handleRouteOrAuthChange(); 
+
+    // Allow App.tsx to trigger UI updates in index.html
+    window.triggerGlobalRouteChange = handleRouteOrAuthChange;
+
+  </script>
+
+</body>
 </html>

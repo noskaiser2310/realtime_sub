@@ -40,6 +40,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess, showToast, 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const handleGoToHomepage = () => {
+    window.location.hash = '';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -128,6 +132,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess, showToast, 
             Đăng ký ngay
           </button>
         </p>
+        <div className="text-center mt-4">
+          <button
+            onClick={handleGoToHomepage}
+            className="w-full max-w-xs mx-auto bg-slate-600 hover:bg-slate-500 text-slate-200 font-medium py-2.5 px-4 rounded-lg shadow-sm transition duration-150 ease-in-out"
+            aria-label="Về Trang Chủ"
+          >
+            Về Trang Chủ
+          </button>
+        </div>
       </div>
        <footer className="mt-8 text-center text-slate-500 text-xs">
         &copy; {new Date().getFullYear()} Real-time Meeting Assistant.

@@ -1,5 +1,5 @@
 {
-  "name": "realtime_sub",
+  "name": "trợ-lý-ai-họp-thông-minh-(website-&-dashboard)",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,13 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/genai": "^1.2.0",
-    "@react-pdf/renderer": "^4.3.0",
-    "@vercel/analytics": "^1.5.0",
-    "bcryptjs": "^2.4.3",
-    "jspdf": "^3.0.1",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "@google/genai": "^1.2.0",
+    "bcryptjs": "^2.4.3",
+    "@react-pdf/renderer": "^4.3.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

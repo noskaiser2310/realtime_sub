@@ -1,6 +1,7 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { LoadingSpinner } from '../LoadingSpinner';
-import { SendIcon } from './icons/FeatureIcons';
+import { SendIcon, ChatBubbleIcon } from './icons/FeatureIcons'; // Added ChatBubbleIcon
 import type { ThemeType } from '../types';
 
 export interface ChatMessage {
@@ -78,11 +79,19 @@ export const Chatbot: React.FC<ChatbotProps> = ({
         ref={containerRef}
         className={`flex-grow p-4 overflow-y-auto space-y-3 scrollbar-thin ${scrollbarThumb} ${scrollbarTrack}`}
       >
-        {chatMessages.length === 0 && !isChatbotLoading && !isSendingMessage && (
-          <p className={`text-center italic ${infoTextColor}`}>Khi có nội dung phiên âm, bạn có thể hỏi về cuộc họp tại đây, kể cả khi đang ghi âm.</p>
+        {chatMessages.length === 0 && isChatbotLoading && !isSendingMessage && (
+            <div className={`flex flex-col items-center justify-center h-full ${infoTextColor} p-4`}>
+                <ChatBubbleIcon className="w-16 h-16 mb-3 sm:mb-4 opacity-50" />
+                <p className="text-center text-sm sm:text-base">
+                    Hỏi & Đáp sẽ hoạt động khi có nội dung phiên âm.
+                </p>
+                <p className="text-center text-xs sm:text-sm mt-1 opacity-80">
+                    Bắt đầu ghi âm hoặc tải một phiên đã lưu.
+                </p>
+            </div>
         )}
-        {chatMessages.length === 0 && isChatbotLoading && !isSendingMessage && ( 
-             <p className={`text-center italic animate-pulse ${infoTextColor}`}>Đang chờ nội dung phiên âm để bắt đầu hỏi đáp...</p>
+        {chatMessages.length === 0 && !isChatbotLoading && !isSendingMessage && (
+          <p className={`text-center italic ${infoTextColor} text-sm sm:text-base`}>Khi có nội dung phiên âm, bạn có thể hỏi về cuộc họp tại đây, kể cả khi đang ghi âm.</p>
         )}
 
         {chatMessages.map((msg) => (
@@ -91,7 +100,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({
             className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[80%] p-3 rounded-xl whitespace-pre-wrap shadow ${
+              className={`max-w-[80%] p-3 rounded-xl whitespace-pre-wrap shadow text-sm sm:text-base ${
                 msg.sender === 'user'
                   ? 'bg-sky-600 text-white'
                   : `${botMessageBg} ${botMessageText}`
@@ -117,7 +126,7 @@ export const Chatbot: React.FC<ChatbotProps> = ({
           onChange={handleInputChange}
           onKeyPress={handleKeyPress}
           placeholder={placeholderText}
-          className={`flex-grow p-2.5 border rounded-lg focus:ring-2 focus:ring-lime-500 focus:border-lime-500 resize-none scrollbar-thin ${inputBgColor} ${inputBorderColor} ${inputTextColor} ${placeholderColor} ${scrollbarThumb} ${scrollbarTrack}`}
+          className={`flex-grow p-2.5 border rounded-lg focus:ring-2 focus:ring-lime-500 focus:border-lime-500 resize-none scrollbar-thin ${inputBgColor} ${inputBorderColor} ${inputTextColor} ${placeholderColor} ${scrollbarThumb} ${scrollbarTrack} text-sm sm:text-base`}
           rows={2}
           disabled={isChatbotLoading || isSendingMessage}
           aria-label="Chat input"
