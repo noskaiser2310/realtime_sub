@@ -147,3 +147,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess, showToast, 
     </div>
   );
 };
+
+export const loginUser = async (userName: string, passwordPlain: string): Promise<CurrentUserSession | null> => {
+  const users = getUsersFromDB();
+  const user = users.find(u => u.userName.toLowerCase() === userName.toLowerCase());
+
+  if (user) {
+    const passwordMatch = await bcrypt.compare(passwordPlain, user.passwordHash);
+    if (passwordMatch) {
+      currentUserSession = { userId: user.userId, userName: user.userName };
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(currentUserSession));
+      
+      // Track login
+      updateAnalytics('login');
+      
+      console.log(`[SessionService] User '${userName}' logged in successfully.`);
+      return currentUserSession;
+    }
+  }
+  console.warn(`[SessionService] Login failed for username '${userName}'.`);
+  return null;
+};

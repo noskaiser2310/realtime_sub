@@ -77,7 +77,7 @@ const MeetingReportPdf = ({ transcript, translation, summaryContent, sourceLangN
 }) => (
   <PdfDocument>
     <PdfPage style={pdfStyles.page}>
-      <PdfText style={pdfStyles.title}>Báo cáo Cuộc họp AI</PdfText>
+      <PdfText style={pdfStyles.title}>Báo cáo Cuộc họp </PdfText>
       <PdfText style={pdfStyles.sectionTitle}>Phiên âm ({sourceLangName})</PdfText>
       <PdfText style={pdfStyles.text}>{transcript || "Chưa có nội dung."}</PdfText>
       {sourceLangName !== targetLangName && (
@@ -86,9 +86,9 @@ const MeetingReportPdf = ({ transcript, translation, summaryContent, sourceLangN
           <PdfText style={pdfStyles.text}>{translation || "Chưa có nội dung."}</PdfText>
         </>
       )}
-      <PdfText style={pdfStyles.sectionTitle}>Tóm tắt - Điểm chính</PdfText>
+      <PdfText style={pdfStyles.sectionTitle}>Tóm tắt - Điểm chính< /PdfText>
       <PdfText style={pdfStyles.text}>{summaryContent[SummaryType.KeyPoints] || "Chưa có nội dung."}</PdfText>
-      <PdfText style={pdfStyles.sectionTitle}>Tóm tắt - Mục hành động</PdfText>
+      <PdfText style={pdfStyles.sectionTitle}>Tóm tắt - Mục hành động </PdfText>
       {summaryContent[SummaryType.ActionItems] ? (
          summaryContent[SummaryType.ActionItems].split('\n').map((item, index) => (
             item.trim() && <PdfText key={index} style={pdfStyles.actionItemText}>- {item.trim()}</PdfText>

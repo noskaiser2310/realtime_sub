@@ -11,6 +11,8 @@ import { RegisterPage } from './pages/RegisterPage';
 import { MainPage } from './pages/MainPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { Analytics } from '@vercel/analytics/react'; // <-- DÒNG 1: THÊM VÀO ĐÂY
+import { FooterStats } from './components/FooterStats';
+import * as sessionService from './services/sessionService';
 
 // Extend window interface for global functions
 declare global {
@@ -20,8 +22,10 @@ declare global {
       isAuthenticated: () => boolean;
       getCurrentUserName: () => string | null;
       logout: () => void;
+      getAnalyticsStats: () => any; // <-- Thêm dòng này
     };
     triggerGlobalRouteChange?: () => void;
+    updateFooterStats?: (stats: any) => void; // <-- Thêm dòng này
   }
 }
 
@@ -141,6 +145,7 @@ const App: React.FC = () => {
       isAuthenticated: sessionService.isAuthenticated,
       getCurrentUserName: sessionService.getCurrentUserName,
       logout: handleLogout,
+      getAnalyticsStats: sessionService.getAnalyticsStats, // THÊM DÒNG NÀY
     };
     // Initial trigger after app logic is ready
     if (window.triggerGlobalRouteChange) {
@@ -180,7 +185,6 @@ const App: React.FC = () => {
       <div className={`app-container min-h-screen ${appSettings.theme}`}>
         {pageContent}
       </div>
-      
       <div
         aria-live="assertive"
         className="pointer-events-none fixed inset-0 flex flex-col items-end space-y-3 px-4 py-6 sm:p-6 z-50" 
