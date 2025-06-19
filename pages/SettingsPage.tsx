@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { AppSettings, LanguageOption, ThemeType } from '../types';
 import { SUPPORTED_LANGUAGES } from '../constants';
@@ -138,7 +137,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </div>
       </div>
       <footer className="mt-8 text-center text-slate-500 text-xs">
-        &copy; {new Date().getFullYear()} Real-time Meeting Assistant.
+        &copy; {new Date().getFullYear()} SmartM AI.
       </footer>
     </div>
   );

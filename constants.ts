@@ -26,8 +26,8 @@ export const SUMMARY_PROMPT_TEMPLATES = {
     `Identify any action items or next steps mentioned in the following meeting transcript. The transcript is in ${languageName}. List them clearly. If no action items are found, state that. Transcript:\n\n"${text}"`,
 };
 
-export const DEFAULT_THEME: ThemeType = 'dark'; // or 'light'
-export const DEFAULT_SOURCE_LANGUAGE: LanguageOption = SUPPORTED_LANGUAGES.find(lang => lang.code === 'en') || SUPPORTED_LANGUAGES[0];
+export const DEFAULT_THEME: ThemeType = 'light'; // Changed from 'dark' to 'light'
+export const DEFAULT_SOURCE_LANGUAGE: LanguageOption = SUPPORTED_LANGUAGES.find(lang => lang.code === 'vi') || SUPPORTED_LANGUAGES[0];
 export const DEFAULT_TARGET_LANGUAGE: LanguageOption = SUPPORTED_LANGUAGES.find(lang => lang.code === 'vi') || SUPPORTED_LANGUAGES[0];
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {

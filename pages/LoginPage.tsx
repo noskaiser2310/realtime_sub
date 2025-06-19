@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import * as sessionService from '../services/sessionService';
 import { LoadingSpinner } from '../LoadingSpinner';
@@ -74,8 +73,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess, showToast, 
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-4">
       <div className="w-full max-w-md p-8 space-y-6 bg-slate-800 rounded-xl shadow-2xl">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-sky-400">Đăng nhập</h1>
-          <p className="mt-2 text-slate-400">Chào mừng trở lại Trợ lý Cuộc họp AI!</p>
+          <h1 className="text-3xl font-bold text-sky-400">Đăng nhập SmartM AI</h1>
+          <p className="mt-2 text-slate-400">Chào mừng trở lại SmartM AI!</p>
         </div>
         
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -143,7 +142,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess, showToast, 
         </div>
       </div>
        <footer className="mt-8 text-center text-slate-500 text-xs">
-        &copy; {new Date().getFullYear()} Real-time Meeting Assistant.
+        &copy; {new Date().getFullYear()} SmartM AI.
       </footer>
     </div>
   );
