@@ -10,6 +10,7 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { MainPage } from './pages/MainPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { Analytics } from '@vercel/analytics/react'; // <-- DÒNG 1: THÊM VÀO ĐÂY
 
 // Extend window interface for global functions
 declare global {
@@ -188,6 +189,7 @@ const App: React.FC = () => {
           <Toast key={toast.id} {...toast} onDismiss={dismissToast} />
         ))}
       </div>
+      <Analytics />
     </>
   );
 };
