@@ -4,81 +4,104 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SmartM AI - Transcribe, Translate, Summarize Meetings</title>
-  
+
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
+  window.__sheets_config = {
+    // URL của "Người Gác Cổng" mà ngài đã cung cấp
+    webAppUrl: 'https://script.google.com/macros/s/AKfycbxRdTQPhdIgErejoByGIHSe9mgQPoVAvm9xl0NypVAM4BAgE_fEsOuuaWnFIfhj6pGl/exec',
+    
+    // Vẫn cần thiết nếu ngài muốn đọc dữ liệu thống kê công khai
+    spreadsheetId: '1RooEpBMYlau2zGhv4vz_JBSZmCf343PP4LbyjsBG1GA', 
+    apiKey: 'AIzaSyDPYLT-_dkwpqcPglxQwm8q6vZgRkLT3vM' // API Key CHỈ ĐỌC
+  };
+</script>
+  <script>
 // Analytics Footer Update Function
 // Enhanced Analytics Footer Update Function
-window.updateFooterStats = function(stats) {
-  const elements = {
-    'total-users': stats.totalUsers || 0,
-    'total-registrations': stats.totalRegistrations || 0,
-    'total-logins': stats.totalLogins || 0
-  };
-  
-  Object.entries(elements).forEach(([id, newValue]) => {
-    const element = document.getElementById(id);
-    if (element) {
-      const currentValue = parseInt(element.textContent) || 0;
-      
-      if (newValue !== currentValue) {
-        // Smooth counter animation
-        animateCounter(element, currentValue, newValue, 1000);
-        
-        // Card glow effect
-        const card = element.closest('.relative.group');
-        if (card) {
-          card.style.boxShadow = '0 0 30px rgba(59, 130, 246, 0.5)';
-          setTimeout(() => {
-            card.style.boxShadow = '';
-          }, 2000);
-        }
-      }
-    }
-  });
-};
 
-// Smooth counter animation function
+// Smooth counter animation function (remains the same)
 function animateCounter(element, start, end, duration) {
   const startTime = Date.now();
   const difference = end - start;
   
-  function updateCounter() {
+  function updateCounterInternal() { // Renamed to avoid conflict
     const elapsed = Date.now() - startTime;
     const progress = Math.min(elapsed / duration, 1);
-    
-    // Easing function for smooth animation
     const easeOutCubic = 1 - Math.pow(1 - progress, 3);
     const current = Math.round(start + (difference * easeOutCubic));
-    
     element.textContent = current.toLocaleString();
-    
     if (progress < 1) {
-      requestAnimationFrame(updateCounter);
+      requestAnimationFrame(updateCounterInternal);
     }
   }
-  
-  requestAnimationFrame(updateCounter);
+  requestAnimationFrame(updateCounterInternal);
 }
+
+// Function to update stats display, now handles hybrid stats object
+function updateDisplayWithStats(stats) {
+  const elementsToUpdate = {
+    'total-users': stats.globalUsers ?? stats.localUsers ?? 0,
+    'total-registrations': stats.globalRegistrations ?? stats.localRegistrations ?? 0,
+    'total-logins': stats.globalLogins ?? stats.localLogins ?? 0,
+  };
+  
+  Object.entries(elementsToUpdate).forEach(([id, newValue]) => {
+    const element = document.getElementById(id);
+    if (element) {
+      const currentValue = parseInt(element.textContent.replace(/,/g, '')) || 0;
+      if (newValue !== currentValue) {
+        animateCounter(element, currentValue, newValue, 1000);
+        const card = element.closest('.relative.group') || element.closest('.bg-slate-800'); // Adjusted selector for cards
+        if (card) {
+          card.style.boxShadow = '0 0 30px rgba(59, 130, 246, 0.5)';
+          setTimeout(() => { card.style.boxShadow = ''; }, 2000);
+        }
+      }
+    }
+  });
+}
+
+// Main function called by App.tsx or intervals
+window.updateFooterStats = async function() {
+  if (window.MyMeetingAppHandle && window.MyMeetingAppHandle.getHybridAnalyticsStats) {
+    try {
+      const stats = await window.MyMeetingAppHandle.getHybridAnalyticsStats();
+      updateDisplayWithStats(stats);
+    } catch (error) {
+      console.error("Error fetching hybrid analytics stats:", error);
+      // Fallback or display error state if needed
+      if (window.MyMeetingAppHandle.getAnalyticsStats) { // Fallback to local if hybrid fails
+         const localStats = window.MyMeetingAppHandle.getAnalyticsStats();
+         updateDisplayWithStats({ // Adapt localStats to expected hybrid structure for display
+            localUsers: localStats.totalUsers,
+            localRegistrations: localStats.totalRegistrations,
+            localLogins: localStats.totalLogins
+         });
+      }
+    }
+  } else if (window.MyMeetingAppHandle && window.MyMeetingAppHandle.getAnalyticsStats) { // Fallback if hybrid not ready
+    const localStats = window.MyMeetingAppHandle.getAnalyticsStats();
+    updateDisplayWithStats({ // Adapt localStats to expected hybrid structure for display
+        localUsers: localStats.totalUsers,
+        localRegistrations: localStats.totalRegistrations,
+        localLogins: localStats.totalLogins
+    });
+  }
+};
 
 
 // Load initial stats when page loads
 window.addEventListener('DOMContentLoaded', function() {
   setTimeout(() => {
-    if (window.MyMeetingAppHandle && window.MyMeetingAppHandle.getAnalyticsStats) {
-      const stats = window.MyMeetingAppHandle.getAnalyticsStats();
-      window.updateFooterStats(stats);
-    }
+    window.updateFooterStats(); // Call the new async updater
   }, 1000); // Wait for React to initialize
 });
 
 // Auto-refresh stats every 30 seconds
 setInterval(() => {
-  if (window.MyMeetingAppHandle && window.MyMeetingAppHandle.getAnalyticsStats) {
-    const stats = window.MyMeetingAppHandle.getAnalyticsStats();
-    window.updateFooterStats(stats);
-  }
+  window.updateFooterStats(); // Call the new async updater
 }, 30000);
 </script>
 
@@ -91,18 +114,19 @@ setInterval(() => {
   <script src="https://unpkg.com/lucide@latest"></script>
 
   <script type="importmap">
-  {
-    "imports": {
-      "react": "https://esm.sh/react@^19.1.0",
-      "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
-      "react/": "https://esm.sh/react@^19.1.0/",
-      "@google/genai": "https://esm.sh/@google/genai@^1.2.0",
-      "bcryptjs": "https://esm.sh/bcryptjs@^2.4.3",
-      "@/App": "./App.tsx",
-      "@react-pdf/renderer": "https://esm.sh/@react-pdf/renderer@^4.3.0"
-    }
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.1.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
+    "react/": "https://esm.sh/react@^19.1.0/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.2.0",
+    "bcryptjs": "https://esm.sh/bcryptjs@^2.4.3",
+    "@/App": "./App.tsx",
+    "@react-pdf/renderer": "https://esm.sh/@react-pdf/renderer@^4.3.0",
+    "@vercel/analytics": "https://esm.sh/@vercel/analytics@^1.5.0"
   }
-  </script>
+}
+</script>
   <style>
     /* Backdrop blur support for older browsers */
   .backdrop-blur-sm {
@@ -463,8 +487,8 @@ setInterval(() => {
                           <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z"/>
                         </svg>
                       </div>
-                      <p class="text-2xl font-bold text-blue-300" id="total-users">0</p>
-                      <p class="text-sm text-slate-400">Tổng Users</p>
+                      <p class="text-2xl font-bold text-blue-300 font-mono" id="total-users">0</p>
+                      <p class="text-sm text-slate-400">Tổng Users (Global)</p>
                     </div>
 
                     <!-- Total Registrations -->
@@ -474,8 +498,8 @@ setInterval(() => {
                           <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z"/>
                         </svg>
                       </div>
-                      <p class="text-2xl font-bold text-green-300" id="total-registrations">0</p>
-                      <p class="text-sm text-slate-400">Đăng ký</p>
+                      <p class="text-2xl font-bold text-green-300 font-mono" id="total-registrations">0</p>
+                      <p class="text-sm text-slate-400">Đăng ký (Global)</p>
                     </div>
 
                     <!-- Total Logins -->
@@ -485,8 +509,8 @@ setInterval(() => {
                           <path fill-rule="evenodd" d="M3 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zm7.707 3.293a1 1 0 010 1.414L9.414 9H17a1 1 0 110 2H9.414l1.293 1.293a1 1 0 01-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0z" clip-rule="evenodd"/>
                         </svg>
                       </div>
-                      <p class="text-2xl font-bold text-purple-300" id="total-logins">0</p>
-                      <p class="text-sm text-slate-400">Đăng nhập</p>
+                      <p class="text-2xl font-bold text-purple-300 font-mono" id="total-logins">0</p>
+                      <p class="text-sm text-slate-400">Đăng nhập (Global)</p>
                     </div>
                   </div>
 
@@ -654,6 +678,7 @@ setInterval(() => {
         }
 
         updateHomepageHeader(); // Always update homepage header based on auth state
+        window.updateFooterStats(); // Refresh footer stats on route change
 
         // Update active state for sidebar links
         Object.values(sidebarLinks).forEach(link => {

@@ -1,13 +1,18 @@
+
 import bcrypt from 'https://esm.sh/bcryptjs@^2.4.3';
 import { track } from '@vercel/analytics';
 import type { SummaryContent } from '../types';
 import { INITIAL_SUMMARY_CONTENT } from '../constants';
+import { trackUserRegistration as trackUserRegistrationGlobally, trackUserLogin as trackUserLoginGlobally, getGlobalStats } from './googleSheetsService';
+
 
 // Storage Keys
 const USER_STORAGE_KEY = 'meetingAssistantUser';
 const USERS_DB_KEY = 'meetingAssistantUsersDB';
 const SESSIONS_STORAGE_KEY_PREFIX = 'meetingAssistantSessions_';
 const ANALYTICS_KEY = 'meetingAssistantAnalytics';
+const INSTALL_ID_KEY = 'smartmAiInstallId';
+
 
 // Interfaces
 export interface MeetingSessionData {
@@ -37,12 +42,23 @@ interface CurrentUserSession {
   userName: string;
 }
 
-interface AnalyticsData {
+export interface AnalyticsData {
   totalRegistrations: number;
   totalLogins: number;
   totalUsers: number;
   lastUpdated: string;
 }
+
+export interface HybridAnalyticsData {
+    localUsers: number;
+    localRegistrations: number;
+    localLogins: number;
+    globalUsers: number;
+    globalRegistrations: number;
+    globalLogins: number;
+    lastUpdated: string;
+}
+
 
 // State
 let currentUserSession: CurrentUserSession | null = null;
@@ -52,11 +68,11 @@ let activeMeetingSessionId: string | null = null;
 // Extend Window for footer updates
 declare global {
   interface Window {
-    updateFooterStats?: (stats: AnalyticsData) => void;
+    updateFooterStats?: (stats: AnalyticsData | HybridAnalyticsData) => void;
   }
 }
 
-// Database Helpers
+// --- Helper Functions ---
 const getUsersFromDB = (): StoredUser[] => {
   const usersJson = localStorage.getItem(USERS_DB_KEY);
   return usersJson ? JSON.parse(usersJson) : [];
@@ -67,30 +83,42 @@ const saveUsersToDB = (users: StoredUser[]) => {
 };
 
 const getMeetingSessionsKeyForCurrentUser = (): string | null => {
-  const userId = getCurrentUserId();
+  const userId = getCurrentUserId(); // getCurrentUserId will call isAuthenticated, which initializes currentUserSession if needed
   return userId ? `${SESSIONS_STORAGE_KEY_PREFIX}${userId}` : null;
 };
 
-// Analytics Functions
+// Install ID Helper
+const getOrCreateInstallId = (): string => {
+  let installId = localStorage.getItem(INSTALL_ID_KEY);
+  if (!installId) {
+    installId = `install_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    localStorage.setItem(INSTALL_ID_KEY, installId);
+  }
+  return installId;
+};
+
+
+// --- Analytics Functions ---
 const getAnalyticsData = (): AnalyticsData => {
   const stored = localStorage.getItem(ANALYTICS_KEY);
   if (!stored) {
     return {
       totalRegistrations: 0,
       totalLogins: 0,
-      totalUsers: 0,
+      totalUsers: getUsersFromDB().length, // Initialize with current user count
       lastUpdated: new Date().toISOString()
     };
   }
-  return JSON.parse(stored);
+  const analytics = JSON.parse(stored) as AnalyticsData;
+  // Ensure totalUsers is up-to-date if it was from an older structure
+  if (analytics.totalUsers !== getUsersFromDB().length) {
+    analytics.totalUsers = getUsersFromDB().length;
+  }
+  return analytics;
 };
 
 const saveAnalyticsData = (analytics: AnalyticsData) => {
   localStorage.setItem(ANALYTICS_KEY, JSON.stringify(analytics));
-  
-  if (window.updateFooterStats) {
-    window.updateFooterStats(analytics);
-  }
 };
 
 const updateAnalytics = (type: 'registration' | 'login') => {
@@ -98,31 +126,50 @@ const updateAnalytics = (type: 'registration' | 'login') => {
   
   if (type === 'registration') {
     analytics.totalRegistrations++;
-    analytics.totalUsers = getUsersFromDB().length;
+    analytics.totalUsers = getUsersFromDB().length; // Update user count on new registration
   } else if (type === 'login') {
     analytics.totalLogins++;
+    // totalUsers is updated via getAnalyticsData which reads from getUsersFromDB
   }
   
   analytics.lastUpdated = new Date().toISOString();
   saveAnalyticsData(analytics);
 };
 
-// Analytics Export
+// Analytics Export (Local only)
 export const getAnalyticsStats = (): AnalyticsData => {
   const analytics = getAnalyticsData();
-  analytics.totalUsers = getUsersFromDB().length;
+  // Ensure totalUsers is absolutely current when this is called externally
+  analytics.totalUsers = getUsersFromDB().length; 
   return analytics;
 };
 
-// User Authentication
-export const registerUser = async (userName: string, passwordPlain: string): Promise<CurrentUserSession | null> => {
+// Hybrid Analytics Export (Local + Global)
+export const getHybridAnalyticsStats = async (): Promise<HybridAnalyticsData> => {
+    const localStats = getAnalyticsStats(); // This now ensures totalUsers is fresh
+    const globalStats = await getGlobalStats();
+
+    return {
+        localUsers: localStats.totalUsers,
+        localRegistrations: localStats.totalRegistrations,
+        localLogins: localStats.totalLogins,
+        globalUsers: globalStats.totalUsers,
+        globalRegistrations: globalStats.totalRegistrations,
+        globalLogins: globalStats.totalLogins,
+        lastUpdated: globalStats.lastUpdated || localStats.lastUpdated,
+    };
+};
+
+
+// --- User Authentication ---
+export const registerUser = async (userName: string, passwordPlain: string): Promise<StoredUser | null> => {
   const users = getUsersFromDB();
   if (users.some(u => u.userName.toLowerCase() === userName.toLowerCase())) {
     console.warn(`Registration failed: Username '${userName}' already exists.`);
     return null;
   }
 
-  const saltRounds = 8;
+  const saltRounds = 10; // Tăng salt rounds để an toàn hơn
   const passwordHash = await bcrypt.hash(passwordPlain, saltRounds);
   
   const newUser: StoredUser = {
@@ -135,47 +182,72 @@ export const registerUser = async (userName: string, passwordPlain: string): Pro
   users.push(newUser);
   saveUsersToDB(users);
   
-  // Track registration analytics
   updateAnalytics('registration');
   
-  // Track global registration via Vercel Analytics
   track('user_registered', { 
     userId: newUser.userId,
     userName: userName,
     timestamp: Date.now()
   });
+
+  const installId = getOrCreateInstallId();
+  // Gửi thông tin đăng ký tới dịch vụ toàn cầu.
+  // Không cần `await` ở đây để tránh block trải nghiệm người dùng.
+  // Việc tracking có thể chạy ngầm.
+  trackUserRegistrationGlobally(newUser.userId, userName, installId)
+    .then(success => {
+      if (success) {
+        console.log(`User '${userName}' registration tracking request sent successfully.`);
+      } else {
+        console.error(`Failed to send registration tracking request for user '${userName}'.`);
+      }
+    });
   
-  console.log(`User '${userName}' registered successfully.`);
-  return loginUser(userName, passwordPlain);
+  console.log(`User '${userName}' registered successfully locally.`);
+  return newUser;
 };
 
-export const loginUser = async (userName: string, passwordPlain: string): Promise<CurrentUserSession | null> => {
-  const users = getUsersFromDB();
-  const user = users.find(u => u.userName.toLowerCase() === userName.toLowerCase());
+/**
+ * Đăng nhập người dùng và lưu session.
+ * @returns CurrentUserSession nếu thành công, null nếu thất bại.
+ */
+export const loginUser = async (userName:string, passwordPlain: string): Promise<CurrentUserSession | null> => {
 
-  if (user) {
-    const passwordMatch = await bcrypt.compare(passwordPlain, user.passwordHash);
-    if (passwordMatch) {
-      currentUserSession = { userId: user.userId, userName: user.userName };
-      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(currentUserSession));
-      
-      // Track login analytics
-      updateAnalytics('login');
-      
-      // Track global login via Vercel Analytics
-      track('user_logged_in', { 
-        userId: user.userId,
-        userName: userName,
-        timestamp: Date.now()
-      });
-      
-      console.log(`User '${userName}' logged in successfully.`);
-      return currentUserSession;
+    const users = getUsersFromDB();
+    const user = users.find(u => u.userName.toLowerCase() === userName.toLowerCase());
+
+    if (user) {
+        const passwordMatch = await bcrypt.compare(passwordPlain, user.passwordHash);
+        if (passwordMatch) {
+            currentUserSession = { userId: user.userId, userName: user.userName };
+            localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(currentUserSession));
+            
+            updateAnalytics('login');
+            
+            track('user_logged_in', { 
+                userId: user.userId,
+                userName: userName,
+                timestamp: Date.now()
+            });
+
+            // Gửi thông tin đăng nhập tới dịch vụ toàn cầu
+            trackUserLoginGlobally(user.userId, userName)
+                .then(success => {
+                    if (success) {
+                        console.log(`User '${userName}' login tracking request sent successfully.`);
+                    } else {
+                        console.error(`Failed to send login tracking request for user '${userName}'.`);
+                    }
+                });
+            
+            console.log(`User '${userName}' logged in successfully locally.`);
+            return currentUserSession;
+        }
     }
-  }
-  console.warn(`Login failed for username '${userName}'.`);
-  return null;
+    console.warn(`Login failed for username '${userName}'.`);
+    return null;
 };
+
 
 export const logoutUser = (): void => {
   currentUserSession = null;
@@ -201,7 +273,7 @@ export const getCurrentUserName = (): string | null => {
   return isAuthenticated() ? currentUserSession!.userName : null;
 };
 
-// Meeting Session Management
+// --- Meeting Session Management ---
 export const startNewMeetingSession = (sourceLang: string, targetLang: string, name?: string): MeetingSessionData | null => {
   if (!isAuthenticated()) {
     console.error("User not authenticated. Cannot start new meeting session.");
@@ -253,8 +325,6 @@ export const updateCurrentMeetingSessionData = (sessionId: string, updates: Part
       localStorage.setItem(sessionsKey, JSON.stringify(sessions));
       console.log(`Updated existing saved meeting session: ${sessionId}`);
     }
-  } else {
-    console.log(`Updated active meeting session data for ${sessionId}:`, updates);
   }
 };
 
@@ -320,4 +390,12 @@ export const getCurrentActiveMeetingSessionId = (): string | null => activeMeeti
 export const getCurrentActiveMeetingSessionData = (): Partial<MeetingSessionData> | null => activeMeetingSessionData;
 
 // Initialize
-isAuthenticated();
+(() => {
+    isAuthenticated(); // Initialize currentUserSession from localStorage if available
+    getOrCreateInstallId(); // Ensure install ID exists on load
+    // Initialize analytics by fetching it, which also ensures totalUsers is set.
+    const initialAnalytics = getAnalyticsData();
+    if (!localStorage.getItem(ANALYTICS_KEY)) { // If it was truly first time, save initial state.
+        saveAnalyticsData(initialAnalytics);
+    }
+})();

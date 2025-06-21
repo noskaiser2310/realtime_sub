@@ -61,25 +61,47 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onAuthSuccess, showT
     return true;
   };
 
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) {
       return;
     }
     setLoading(true);
+    setError('');
+
     try {
-      const newUserSession = await sessionService.registerUser(username, password);
-      if (newUserSession) {
-        showToast('Đăng ký thành công! Đang đăng nhập...', 'success');
-        // Wait for toast to be visible before navigating
-        await new Promise(resolve => setTimeout(resolve, 1000)); 
-        onAuthSuccess(newUserSession.userName, newUserSession.userId);
-      } else {
-        setError('Tên người dùng đã tồn tại hoặc có lỗi xảy ra.');
+      // BƯỚC 1: Chỉ đăng ký người dùng.
+      const newUser = await sessionService.registerUser(username, password);
+      
+      if (!newUser) {
+        // Tên người dùng đã tồn tại
+        setError('Tên người dùng đã tồn tại. Vui lòng chọn tên khác.');
         showToast('Đăng ký thất bại. Tên người dùng có thể đã được sử dụng.', 'error');
+        setLoading(false);
+        return;
       }
+
+      // Đăng ký cục bộ thành công!
+      showToast('Tài khoản đã được tạo! Đang đăng nhập...', 'info');
+
+      // BƯỚC 2: Tự động đăng nhập sau khi đăng ký thành công.
+      const session = await sessionService.loginUser(username, password);
+
+      if (session) {
+        showToast('Đăng nhập thành công!', 'success');
+        // Chờ một chút để người dùng thấy toast
+        await new Promise(resolve => setTimeout(resolve, 500)); 
+        onAuthSuccess(session.userName, session.userId);
+      } else {
+        // Trường hợp hiếm gặp: đăng ký được nhưng đăng nhập ngay sau đó lại lỗi.
+        setError('Tài khoản đã được tạo nhưng không thể tự động đăng nhập. Vui lòng thử đăng nhập thủ công.');
+        showToast('Lỗi đăng nhập tự động.', 'error');
+        navigateTo('login'); // Điều hướng đến trang đăng nhập
+      }
+
     } catch (err) {
-      console.error("Registration error:", err);
+      console.error("Registration process error:", err);
       setError('Lỗi hệ thống trong quá trình đăng ký. Vui lòng thử lại.');
       showToast('Lỗi hệ thống khi đăng ký.', 'error');
     } finally {
