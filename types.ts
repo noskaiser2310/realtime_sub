@@ -36,9 +36,28 @@ export type RouteType = 'login' | 'register' | 'main' | 'settings';
 
 export type AppStatusType = 'initializing' | 'auth_required' | 'app_ready';
 
+export type PlanTierId = 'guest' | 'student' | 'standard' | 'premium';
+
+export interface PlanFeatureConfig {
+  moreLanguageOptions: boolean;
+  textToSpeech: boolean;
+  pdfReport: boolean;
+  advancedTranslation: boolean;
+}
+
+export interface PlanDetails {
+  id: PlanTierId;
+  name: string;
+  price: string;
+  usageLimitHours: number;
+  features: PlanFeatureConfig;
+  featureListDisplay: string[];
+}
+
 export interface UserDataState {
   name: string;
   id: string | null;
+  planTier: PlanTierId | null;
 }
 
 export interface ToastMessage {

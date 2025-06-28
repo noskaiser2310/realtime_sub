@@ -1,18 +1,18 @@
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import * as sessionService from './services/sessionService';
 import { settingsService } from './services/settingsService';
-import type { RouteType, AppStatusType, UserDataState, ToastMessage, AppSettings } from './types';
-import { DEFAULT_APP_SETTINGS } from './constants';
+import type { RouteType, AppStatusType, UserDataState, ToastMessage, AppSettings, PlanTierId, PlanDetails } from './types';
+import { DEFAULT_APP_SETTINGS, PLAN_CONFIG, DEFAULT_PLAN_ID } from './constants';
 import { LoadingSpinner } from './LoadingSpinner';
 import { Toast } from './components/Toast';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { MainPage } from './pages/MainPage';
 import { SettingsPage } from './pages/SettingsPage';
-import { Analytics } from '@vercel/analytics/react'; // <-- DÒNG 1: THÊM VÀO ĐÂY
+import { Analytics } from '@vercel/analytics/react'; 
 
-// Extend window interface for global functions
 declare global {
   interface Window {
     MyMeetingAppHandle?: {
@@ -20,8 +20,10 @@ declare global {
       isAuthenticated: () => boolean;
       getCurrentUserName: () => string | null;
       logout: () => void;
-      getAnalyticsStats: () => sessionService.AnalyticsData; // Keep existing local for fallback
-      getHybridAnalyticsStats: () => Promise<sessionService.HybridAnalyticsData>; // Add new hybrid
+      getAnalyticsStats: () => sessionService.AnalyticsData; 
+      getHybridAnalyticsStats: () => Promise<sessionService.HybridAnalyticsData>;
+      updateUserPlan: (planId: PlanTierId) => void; // New: For checkout to call
+      triggerUsageDisplayUpdate?: () => void; // For MainPage to listen to
     };
     triggerGlobalRouteChange?: () => void;
   }
@@ -31,10 +33,12 @@ declare global {
 const App: React.FC = () => {
   const [appStatus, setAppStatus] = useState<AppStatusType>('initializing');
   const [currentRoute, setCurrentRoute] = useState<RouteType>('login');
-  const [userData, setUserData] = useState<UserDataState>({ name: '', id: null });
+  const [userData, setUserData] = useState<UserDataState>({ name: '', id: null, planTier: null });
   const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
   const [toastMessages, setToastMessages] = useState<ToastMessage[]>([]);
-  const [mainPageKey, setMainPageKey] = useState<number>(Date.now()); // For resetting MainPage
+  const [mainPageKey, setMainPageKey] = useState<number>(Date.now()); 
+  const [currentPlanDetails, setCurrentPlanDetails] = useState<PlanDetails>(PLAN_CONFIG[DEFAULT_PLAN_ID]);
+
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info') => {
     const id = Date.now();
@@ -54,8 +58,7 @@ const App: React.FC = () => {
     }
 
     if (currentRoute !== route || currentHashTarget !== route || options.showSavedSessions) {
-        setCurrentRoute(route); // Update internal React state
-        // Update URL hash, which then triggers handleRouteOrAuthChange in index.html
+        setCurrentRoute(route); 
         const newHash = `#/${newRouteTarget}`;
         if (window.location.hash !== newHash) {
              if (replace) {
@@ -64,93 +67,118 @@ const App: React.FC = () => {
                 window.location.hash = newHash;
             }
         } else {
-            // If hash is already correct, but we need to trigger UI update (e.g. for sidebar)
             if (window.triggerGlobalRouteChange) window.triggerGlobalRouteChange();
         }
     } else if (window.triggerGlobalRouteChange) {
-        // Even if route is the same, options might change visibility of components within index.html
         window.triggerGlobalRouteChange();
     }
   }, [currentRoute]);
 
+  const updateUserPlanDetails = useCallback((planId: PlanTierId | null) => {
+    setCurrentPlanDetails(PLAN_CONFIG[planId || DEFAULT_PLAN_ID]);
+    if (window.MyMeetingAppHandle?.triggerUsageDisplayUpdate) {
+      window.MyMeetingAppHandle.triggerUsageDisplayUpdate();
+    }
+  }, []);
+
 
   const handleAuthSuccess = useCallback(async (name: string, userId: string) => {
-    setUserData({ name, id: userId });
+    const userPlanId = sessionService.getCurrentUserPlanTier(userId);
+    setUserData({ name, id: userId, planTier: userPlanId });
+    updateUserPlanDetails(userPlanId);
     const loadedSettings = await settingsService.init(userId);
     setAppSettings(loadedSettings);
     setAppStatus('app_ready');
     
-    // Redirect to homepage, index.html will handle UI update
-    window.location.href = window.location.pathname; // Clears hash
+    window.location.href = window.location.pathname; 
     if (window.triggerGlobalRouteChange) window.triggerGlobalRouteChange();
 
-  }, []);
+  }, [updateUserPlanDetails]);
 
  const handleLogout = useCallback(async () => {
     sessionService.logoutUser();
-    setUserData({ name: '', id: null });
-    const guestSettings = await settingsService.init(null);
+    setUserData({ name: '', id: null, planTier: null });
+    updateUserPlanDetails(null); // Set to guest plan details
+    const guestSettings = await settingsService.init(null); 
     setAppSettings(guestSettings);
-    setCurrentRoute('login'); // Set default route for next dashboard view
+    setCurrentRoute('login'); 
     setAppStatus('auth_required');
     showToast('Đã đăng xuất.', 'info');
     
-    // Redirect to homepage, index.html will handle UI update
-    window.location.href = window.location.pathname; // Clears hash
+    window.location.href = window.location.pathname; 
     if (window.triggerGlobalRouteChange) window.triggerGlobalRouteChange();
 
-  }, [showToast]);
+  }, [showToast, updateUserPlanDetails]);
 
   const handleUpdateSettings = useCallback(async (newSettings: Partial<AppSettings>) => {
     const updatedSettings = await settingsService.updateSettings(newSettings);
     setAppSettings(updatedSettings);
   }, []);
 
+  const handleUpdateUserPlan = useCallback(async (planId: PlanTierId) => {
+    if (userData.id) {
+        const success = await sessionService.updateUserPlan(userData.id, planId);
+        if (success) {
+            setUserData(prev => ({ ...prev, planTier: planId }));
+            updateUserPlanDetails(planId);
+            showToast(`Đã nâng cấp gói thành công thành ${PLAN_CONFIG[planId].name}!`, 'success');
+        } else {
+            showToast('Nâng cấp gói thất bại. Vui lòng thử lại.', 'error');
+        }
+    } else {
+        showToast('Vui lòng đăng nhập để thay đổi gói.', 'error');
+        navigateTo('login'); // Redirect to login if not authenticated
+    }
+  }, [userData.id, showToast, navigateTo, updateUserPlanDetails]);
+
+
   useEffect(() => {
     const initializeApp = async () => {
       let currentUserId = sessionService.getCurrentUserId();
       let finalSettings: AppSettings;
+      let userPlanId: PlanTierId = DEFAULT_PLAN_ID;
 
       if (sessionService.isAuthenticated() && currentUserId) {
-        setUserData({ name: sessionService.getCurrentUserName() || 'User', id: currentUserId });
+        userPlanId = sessionService.getCurrentUserPlanTier(currentUserId);
+        setUserData({ name: sessionService.getCurrentUserName() || 'User', id: currentUserId, planTier: userPlanId });
         finalSettings = await settingsService.init(currentUserId);
         setAppSettings(finalSettings);
-        // Determine initial route from hash or default to main
         const hashRoute = window.location.hash.substring(2).split('?')[0] as RouteType;
         setCurrentRoute(['main', 'settings', 'login', 'register'].includes(hashRoute) ? hashRoute : 'main');
         setAppStatus('app_ready');
       } else {
-        finalSettings = await settingsService.init(null); // Guest settings
+        finalSettings = await settingsService.init(null); 
         setAppSettings(finalSettings);
         const hashRoute = window.location.hash.substring(2).split('?')[0] as RouteType;
         setCurrentRoute(hashRoute === 'register' ? 'register' : 'login');
         setAppStatus('auth_required');
       }
+      updateUserPlanDetails(userPlanId);
       if (window.triggerGlobalRouteChange) window.triggerGlobalRouteChange();
     };
     initializeApp();
-  }, []);
+  }, [updateUserPlanDetails]);
   
   useEffect(() => {
     document.documentElement.className = appSettings.theme;
     document.body.className = appSettings.theme === 'dark' ? 'bg-slate-900' : 'bg-sky-50';
   }, [appSettings.theme]);
 
-  // Expose methods to global scope for index.html
   useEffect(() => {
     window.MyMeetingAppHandle = {
+      ...window.MyMeetingAppHandle, // Preserve existing methods if any
       navigateToRoute: navigateTo,
       isAuthenticated: sessionService.isAuthenticated,
       getCurrentUserName: sessionService.getCurrentUserName,
       logout: handleLogout,
-      getAnalyticsStats: sessionService.getAnalyticsStats, // Local stats
-      getHybridAnalyticsStats: sessionService.getHybridAnalyticsStats, // Hybrid stats
+      getAnalyticsStats: sessionService.getAnalyticsStats, 
+      getHybridAnalyticsStats: sessionService.getHybridAnalyticsStats,
+      updateUserPlan: handleUpdateUserPlan, 
     };
-    // Initial trigger after app logic is ready
     if (window.triggerGlobalRouteChange) {
         window.triggerGlobalRouteChange();
     }
-  }, [navigateTo, handleLogout]);
+  }, [navigateTo, handleLogout, handleUpdateUserPlan]);
 
 
   if (appStatus === 'initializing') {
@@ -161,8 +189,6 @@ const App: React.FC = () => {
     );
   }
   
-  // Render content based on currentRoute, only if dashboard is active
-  // The visibility of the entire dashboard section is controlled by index.html
   let pageContent = null;
   if (appStatus === 'auth_required') {
     if (currentRoute === 'login') {
@@ -172,7 +198,7 @@ const App: React.FC = () => {
     }
   } else if (appStatus === 'app_ready' && userData.id) {
     if (currentRoute === 'main') {
-      pageContent = <MainPage key={mainPageKey} userData={userData} appSettings={appSettings} showToast={showToast} navigateTo={navigateTo} onSettingsChange={handleUpdateSettings} />;
+      pageContent = <MainPage key={mainPageKey} userData={userData} appSettings={appSettings} planDetails={currentPlanDetails} showToast={showToast} navigateTo={navigateTo} onSettingsChange={handleUpdateSettings} />;
     } else if (currentRoute === 'settings') {
       pageContent = <SettingsPage currentSettings={appSettings} onUpdateSettings={handleUpdateSettings} showToast={showToast} navigateTo={navigateTo} />;
     }

@@ -1,8 +1,9 @@
 
+
 import bcrypt from 'https://esm.sh/bcryptjs@^2.4.3';
 import { track } from '@vercel/analytics';
-import type { SummaryContent } from '../types';
-import { INITIAL_SUMMARY_CONTENT } from '../constants';
+import type { SummaryContent, PlanTierId } from '../types';
+import { INITIAL_SUMMARY_CONTENT, getUsageLimitSecondsByPlan, DEFAULT_PLAN_ID } from '../constants';
 import { trackUserRegistration as trackUserRegistrationGlobally, trackUserLogin as trackUserLoginGlobally, getGlobalStats } from './googleSheetsService';
 
 
@@ -35,6 +36,9 @@ interface StoredUser {
   userName: string;
   passwordHash: string;
   createdAt: string;
+  planType?: PlanTierId;
+  totalAudioUsedMs?: number;
+  lastAudioUsageDate?: string;
 }
 
 interface CurrentUserSession {
@@ -177,6 +181,9 @@ export const registerUser = async (userName: string, passwordPlain: string): Pro
     userName: userName,
     passwordHash: passwordHash,
     createdAt: new Date().toISOString(),
+    planType: 'guest',
+    totalAudioUsedMs: 0,
+    lastAudioUsageDate: new Date().toISOString(),
   };
   
   users.push(newUser);
@@ -272,6 +279,98 @@ export const getCurrentUserId = (): string | null => {
 export const getCurrentUserName = (): string | null => {
   return isAuthenticated() ? currentUserSession!.userName : null;
 };
+
+// --- Plan & Usage Management ---
+const getValidatedUserAndSave = (userId: string): { user: StoredUser | null; users: StoredUser[]; userIndex: number } => {
+    const users = getUsersFromDB();
+    const userIndex = users.findIndex(u => u.userId === userId);
+    if (userIndex === -1) {
+        return { user: null, users, userIndex };
+    }
+    
+    const user = users[userIndex];
+    let userWasModified = false;
+
+    // Initialize fields if they don't exist for older user entries
+    if (typeof user.totalAudioUsedMs !== 'number') {
+      user.totalAudioUsedMs = 0;
+      userWasModified = true;
+    }
+    if (typeof user.lastAudioUsageDate !== 'string') {
+      user.lastAudioUsageDate = new Date().toISOString();
+      userWasModified = true;
+    }
+
+    const lastReset = user.lastAudioUsageDate ? new Date(user.lastAudioUsageDate).getTime() : 0;
+    const lastDate = new Date(lastReset);
+    const today = new Date();
+    
+    // Corrected logic for monthly reset
+    if (today.getFullYear() > lastDate.getFullYear() || (today.getFullYear() === lastDate.getFullYear() && today.getMonth() > lastDate.getMonth())) {
+        console.log(`Monthly usage reset for user ${userId}.`);
+        user.totalAudioUsedMs = 0;
+        user.lastAudioUsageDate = today.toISOString(); 
+        userWasModified = true;
+    }
+
+    if (userWasModified) {
+      saveUsersToDB(users);
+    }
+    
+    return { user, users, userIndex };
+};
+
+export const getCurrentUserPlanTier = (userId: string): PlanTierId => {
+    const users = getUsersFromDB();
+    const user = users.find(u => u.userId === userId);
+    return user?.planType || DEFAULT_PLAN_ID;
+};
+
+export const getMonthlyUsageLimitSeconds = (userId: string | null): number => {
+    if (!userId) return getUsageLimitSecondsByPlan('guest');
+    const planId = getCurrentUserPlanTier(userId);
+    return getUsageLimitSecondsByPlan(planId);
+};
+
+export const getMonthlyUsedSeconds = (userId: string): number => {
+    const { user } = getValidatedUserAndSave(userId);
+    return user ? (user.totalAudioUsedMs || 0) / 1000 : 0;
+};
+
+export const hasUsageQuotaRemaining = (userId: string): boolean => {
+    const usedSeconds = getMonthlyUsedSeconds(userId);
+    const limitSeconds = getMonthlyUsageLimitSeconds(userId);
+    return usedSeconds < limitSeconds;
+};
+
+export const recordAudioUsage = (userId: string, durationSeconds: number) => {
+    if (durationSeconds <= 0) return;
+
+    const { user, users, userIndex } = getValidatedUserAndSave(userId);
+    if (!user) return;
+
+    user.totalAudioUsedMs = (user.totalAudioUsedMs || 0) + (durationSeconds * 1000);
+    // Don't update lastAudioUsageDate here; it's for tracking the reset period.
+    users[userIndex] = user;
+    saveUsersToDB(users);
+    
+    window.dispatchEvent(new CustomEvent('updateUsage'));
+};
+
+
+export const updateUserPlan = async (userId: string, planId: PlanTierId): Promise<boolean> => {
+    const users = getUsersFromDB();
+    const userIndex = users.findIndex(u => u.userId === userId);
+    if (userIndex === -1) {
+        console.error("updateUserPlan: User not found.");
+        return false;
+    }
+    users[userIndex].planType = planId;
+    saveUsersToDB(users);
+    console.log(`User ${userId} plan updated to ${planId}`);
+    return true;
+};
+
 
 // --- Meeting Session Management ---
 export const startNewMeetingSession = (sourceLang: string, targetLang: string, name?: string): MeetingSessionData | null => {

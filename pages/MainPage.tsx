@@ -10,7 +10,7 @@ import * as ttsService from '../services/ttsService';
 import * as sessionService from '../services/sessionService';
 import type { MeetingSessionData } from '../services/sessionService';
 import { RecordingState, SummaryType } from '../types';
-import type { LanguageOption, SummaryContent, AppSettings, ActionTabType } from '../types';
+import type { LanguageOption, SummaryContent, AppSettings, ActionTabType, PlanDetails } from '../types';
 import { INITIAL_SUMMARY_CONTENT, SUPPORTED_LANGUAGES } from '../constants';
 import { MicIcon, DownloadIcon, BrainIcon, LanguagesIcon, ChatBubbleIcon, FileAudioIcon, VolumeUpIcon, EditIcon, UserCircleIcon, LogoutIcon, SaveIcon, CogIcon, ArchiveIcon, LoadIcon, TrashIcon, SettingsIcon, MicOffIcon, ListChecksIcon, LightbulbIcon } from '../components/icons/FeatureIcons';
 import { SpeakerOnIcon, SpeakerOffIcon, PlayIcon, StopIcon, PauseIcon as MediaPauseIcon, RecordingStatusIcon } from '../components/icons/MediaIcons';
@@ -25,7 +25,7 @@ PdfFont.register({
   fonts: [
     {
       src: '/fonts/NotoSans-Regular.ttf', // Đường dẫn từ public folder
-      fontWeight: 'normal',
+      fontWeight: 'normal'
     }
   ]
 });
@@ -37,14 +37,14 @@ const pdfStyles = PdfStyleSheet.create({
     paddingBottom: 65,
     paddingHorizontal: 35,
     lineHeight: 1.5,
-    fontFamily: 'NotoSans',
+    fontFamily: 'NotoSans'
   },
   title: {
     fontSize: 18,
     textAlign: 'center',
     marginBottom: 20,
     fontWeight: 'bold',
-    fontFamily: 'NotoSans',
+    fontFamily: 'NotoSans'
   },
   sectionTitle: {
     fontSize: 14,
@@ -54,15 +54,15 @@ const pdfStyles = PdfStyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#cccccc',
     paddingBottom: 3,
-    fontFamily: 'NotoSans',
+    fontFamily: 'NotoSans'
   },
   text: {
     textAlign: 'justify',
-    fontFamily: 'NotoSans',
+    fontFamily: 'NotoSans'
   },
   actionItemText: {
     marginBottom: 3,
-    fontFamily: 'NotoSans',
+    fontFamily: 'NotoSans'
   }
 });
 
@@ -77,7 +77,7 @@ const MeetingReportPdf = ({ transcript, translation, summaryContent, sourceLangN
 }) => (
   <PdfDocument>
     <PdfPage style={pdfStyles.page}>
-      <PdfText style={pdfStyles.title}>Báo cáo Cuộc họp </PdfText>
+      <PdfText style={pdfStyles.title}>Báo cáo Cuộc họp</PdfText>
       <PdfText style={pdfStyles.sectionTitle}>Phiên âm ({sourceLangName})</PdfText>
       <PdfText style={pdfStyles.text}>{transcript || "Chưa có nội dung."}</PdfText>
       {sourceLangName !== targetLangName && (
@@ -86,12 +86,12 @@ const MeetingReportPdf = ({ transcript, translation, summaryContent, sourceLangN
           <PdfText style={pdfStyles.text}>{translation || "Chưa có nội dung."}</PdfText>
         </>
       )}
-      <PdfText style={pdfStyles.sectionTitle}>Tóm tắt - Điểm chính< /PdfText>
+      <PdfText style={pdfStyles.sectionTitle}>Tóm tắt - Điểm chính</PdfText>
       <PdfText style={pdfStyles.text}>{summaryContent[SummaryType.KeyPoints] || "Chưa có nội dung."}</PdfText>
-      <PdfText style={pdfStyles.sectionTitle}>Tóm tắt - Mục hành động </PdfText>
+      <PdfText style={pdfStyles.sectionTitle}>Tóm tắt - Mục hành động</PdfText>
       {summaryContent[SummaryType.ActionItems] ? (
          summaryContent[SummaryType.ActionItems].split('\n').map((item, index) => (
-            item.trim() && <PdfText key={index} style={pdfStyles.actionItemText}>- {item.trim()}</PdfText>
+            item.trim() ? <PdfText key={index} style={pdfStyles.actionItemText}>- {item.trim()}</PdfText> : null
          ))
       ) : (
         <PdfText style={pdfStyles.text}>Chưa có nội dung.</PdfText>
@@ -115,8 +115,9 @@ export const useSmartScroll = (dependency: any[]): React.RefObject<HTMLDivElemen
 };
 
 interface MainPageProps {
-  userData: { name: string; id: string | null };
+  userData: { name: string; id: string | null; planTier: string | null };
   appSettings: AppSettings;
+  planDetails: PlanDetails;
   showToast: (message: string, type: 'success' | 'error' | 'info') => void;
   navigateTo: (route: 'settings') => void;
   onSettingsChange: (newSettings: Partial<AppSettings>) => Promise<void>;
@@ -125,6 +126,7 @@ interface MainPageProps {
 export const MainPage: React.FC<MainPageProps> = ({
     userData,
     appSettings,
+    planDetails,
     showToast,
     navigateTo,
     onSettingsChange
@@ -152,6 +154,10 @@ export const MainPage: React.FC<MainPageProps> = ({
   const [savedMeetingSessions, setSavedMeetingSessions] = useState<MeetingSessionData[]>([]);
   const [loadedMeetingSessionId, setLoadedMeetingSessionId] = useState<string | null>(null);
   const [activeActionTab, setActiveActionTab] = useState<ActionTabType>('summary');
+  
+  const [usedSeconds, setUsedSeconds] = useState(0);
+  const [usageLimitSeconds, setUsageLimitSeconds] = useState(0);
+  const [usagePercentage, setUsagePercentage] = useState(0);
 
   const timerIntervalRef = useRef<number | null>(null);
   const translationQueueRef = useRef<string[]>([]);
@@ -162,6 +168,10 @@ export const MainPage: React.FC<MainPageProps> = ({
   const micClarityHintRef = useRef<'low' | 'normal'>('normal');
   const micErrorRef = useRef<boolean>(false);
   const transcriptEditAreaRef = useRef<HTMLTextAreaElement>(null);
+  const elapsedTimeRef = useRef(0);
+  useEffect(() => {
+    elapsedTimeRef.current = elapsedTime;
+  }, [elapsedTime]);
 
   const transcriptContainerRef = useSmartScroll([meetingTranscript, editedTranscript]);
   const translationContainerRef = useSmartScroll([fullTranslatedTranscript]);
@@ -207,6 +217,41 @@ export const MainPage: React.FC<MainPageProps> = ({
       setLoadedMeetingSessionId(null);
     }
   }, [userData.id]);
+
+  const formatDuration = (totalSeconds: number): string => {
+    if (totalSeconds < 0) totalSeconds = 0;
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = Math.floor(totalSeconds % 60);
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const updateUsageDisplay = useCallback(() => {
+    if (!userData.id) {
+        setUsedSeconds(0);
+        setUsageLimitSeconds(sessionService.getMonthlyUsageLimitSeconds(null));
+        setUsagePercentage(0);
+        return;
+    }
+    const limit = sessionService.getMonthlyUsageLimitSeconds(userData.id);
+    const used = sessionService.getMonthlyUsedSeconds(userData.id);
+    const percentage = limit > 0 ? (used / limit) * 100 : 0;
+    
+    setUsedSeconds(used);
+    setUsageLimitSeconds(limit);
+    setUsagePercentage(percentage);
+  }, [userData.id]);
+
+  useEffect(() => {
+    updateUsageDisplay();
+    
+    const handleUsageUpdate = () => updateUsageDisplay();
+    window.addEventListener('updateUsage', handleUsageUpdate);
+
+    return () => {
+      window.removeEventListener('updateUsage', handleUsageUpdate);
+    };
+  }, [updateUsageDisplay, planDetails]);
 
   const stableProcessTranslationQueue = useCallback(async () => {
     if (isProcessingTranslationQueueRef.current || translationQueueRef.current.length === 0) {
@@ -315,6 +360,7 @@ export const MainPage: React.FC<MainPageProps> = ({
       } else if (newState === RecordingState.Stopped && details?.errorMessage) {
          showToast("Ghi âm dừng do lỗi. Phiên không được tự động lưu.", "error");
       }
+      updateUsageDisplay();
     }
 
     if (newState === RecordingState.Initializing) {
@@ -340,7 +386,7 @@ export const MainPage: React.FC<MainPageProps> = ({
     if (newState === RecordingState.Recording) {
         setIsUiLocked(false);
     }
-  }, [showToast]); // Only stable showToast. All other dynamic values are via refs or are setters.
+  }, [showToast, updateUsageDisplay]); // Only stable showToast. All other dynamic values are via refs or are setters.
 
   const handleMicVolumeUpdate = useCallback((volume: number, clarityHint: 'low' | 'normal') => {
       micVolumeLevelRef.current = volume;
@@ -403,6 +449,10 @@ export const MainPage: React.FC<MainPageProps> = ({
         showToast("Vui lòng đăng nhập để bắt đầu ghi âm.", "error");
         return;
     }
+    if (!sessionService.hasUsageQuotaRemaining(userDataRef.current.id)) {
+        showToast("Bạn đã hết thời gian ghi âm trong tháng này.", "error");
+        return;
+    }
 
     setElapsedTime(0);
     micErrorRef.current = false;
@@ -423,12 +473,18 @@ export const MainPage: React.FC<MainPageProps> = ({
       const activeMeetingId = sessionService.getCurrentActiveMeetingSessionId();
       if (activeMeetingId) sessionService.deleteMeetingSession(activeMeetingId);
     }
-  }, [currentRecordingState, showToast]); // Removed sourceLanguage.code and userData.id
+  }, [currentRecordingState, showToast]);
 
   const handleStopRecording = useCallback(() => {
+    const recordingDuration = elapsedTimeRef.current;
     audioService.stopAudioProcessing();
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-  }, []);
+    
+    if (userDataRef.current.id && recordingDuration > 0) {
+      sessionService.recordAudioUsage(userDataRef.current.id, recordingDuration);
+      updateUsageDisplay();
+    }
+  }, [updateUsageDisplay]);
 
   const handleToggleMicMute = useCallback(() => {
       if (currentRecordingState === RecordingState.Recording) {
@@ -456,7 +512,7 @@ export const MainPage: React.FC<MainPageProps> = ({
     } finally {
       setIsGeminiSummaryLoading(null);
     }
-  }, [isGeminiSummaryLoading, loadedMeetingSessionId, showToast]); // Removed state/prop direct dependencies
+  }, [isGeminiSummaryLoading, loadedMeetingSessionId, showToast]);
 
   const handleChatbotSendMessage = useCallback(async (message: string) => {
     const newUserMessage: ChatMessage = { id: Date.now().toString(), text: message, sender: 'user' };
@@ -482,7 +538,7 @@ export const MainPage: React.FC<MainPageProps> = ({
     } finally {
       setIsGeminiChatbotLoading(false);
     }
-  }, [showToast]); // Removed state/prop direct dependencies
+  }, [showToast]);
 
   const downloadFile = useCallback((content: string | Blob, filename: string, mimeType: string) => {
     const blob = content instanceof Blob ? content : new Blob([content], { type: mimeType });
@@ -508,15 +564,15 @@ export const MainPage: React.FC<MainPageProps> = ({
   }, [downloadFile, showToast]);
 
   const handleDownloadTranslatedTranscript = useCallback(() => {
-    if (!fullTranslatedTranscript.trim()) { // fullTranslatedTranscript is state, use directly
+    if (!fullTranslatedTranscript.trim()) {
       showToast("Không có nội dung dịch để tải.", 'info');
       return;
     }
     downloadFile(fullTranslatedTranscript, `translation_${targetLanguageRef.current.code}.txt`, 'text/plain;charset=utf-8');
-  }, [fullTranslatedTranscript, downloadFile, showToast]); // Added targetLanguageRef
+  }, [fullTranslatedTranscript, downloadFile, showToast]);
 
   const handleDownloadSummary = useCallback(() => {
-    const summaryContent = // summary is state, use directly
+    const summaryContent =
 `Điểm chính:\n${summary[SummaryType.KeyPoints] || 'Chưa có.'}\n\nMục hành động:\n${summary[SummaryType.ActionItems] || 'Chưa có.'}`;
     if (!summary[SummaryType.KeyPoints] && !summary[SummaryType.ActionItems]) {
          showToast("Không có nội dung tóm tắt để tải.", 'info');
@@ -543,11 +599,11 @@ export const MainPage: React.FC<MainPageProps> = ({
 
   const handleSpeakAllProcessedText = useCallback(() => {
     const transcriptForTTS = isEditingTranscriptRef.current ? (editedTranscriptRef.current ?? meetingTranscriptRef.current) : meetingTranscriptRef.current;
-    const textToSpeak = sourceLanguageRef.current.code === targetLanguageRef.current.code ? transcriptForTTS : fullTranslatedTranscript; // fullTranslatedTranscript is state
-    if (textToSpeak.trim() && canSpeakCurrentTargetLang && !isTtsActive) { // canSpeakCurrentTargetLang, isTtsActive are state
+    const textToSpeak = sourceLanguageRef.current.code === targetLanguageRef.current.code ? transcriptForTTS : fullTranslatedTranscript;
+    if (textToSpeak.trim() && canSpeakCurrentTargetLang && !isTtsActive) {
       ttsService.speak(textToSpeak, targetLanguageRef.current.code, true);
     }
-  }, [fullTranslatedTranscript, canSpeakCurrentTargetLang, isTtsActive]); // Added dependencies
+  }, [fullTranslatedTranscript, canSpeakCurrentTargetLang, isTtsActive]);
 
   const handleToggleEditTranscript = () => {
     setIsEditingTranscript(prev => {
@@ -576,10 +632,10 @@ export const MainPage: React.FC<MainPageProps> = ({
         stableProcessTranslationQueue();
     }
     setSummary(INITIAL_SUMMARY_CONTENT);
-  }, [stableProcessTranslationQueue, loadedMeetingSessionId, showToast]); // Added dependencies
+  }, [stableProcessTranslationQueue, loadedMeetingSessionId, showToast]);
 
   const handleLoadMeetingSession = (sessionId: string) => {
-    if (!userDataRef.current.id) return; // Use ref
+    if (!userDataRef.current.id) return;
     const session = sessionService.getMeetingSession(sessionId);
     if (session) {
         // Inlined resetForNewMeetingSession logic for loaded session
@@ -614,7 +670,7 @@ export const MainPage: React.FC<MainPageProps> = ({
   };
 
   const handleDeleteMeetingSession = (sessionId: string) => {
-    if (!userDataRef.current.id) return; // Use ref
+    if (!userDataRef.current.id) return;
     if (confirm("Bạn có chắc chắn muốn xóa phiên này? Hành động này không thể hoàn tác.")) {
         sessionService.deleteMeetingSession(sessionId);
         setSavedMeetingSessions(sessionService.listMeetingSessions());
@@ -637,14 +693,14 @@ export const MainPage: React.FC<MainPageProps> = ({
 
   const handleSourceLangChange = (lang: LanguageOption) => {
     if (isRecordingInProgress) { showToast("Không thể đổi ngôn ngữ khi đang ghi âm.", "error"); return; }
-    onSettingsChange({ sourceLanguage: lang }); // This will update appSettings prop, then sourceLanguage state via useEffect
+    onSettingsChange({ sourceLanguage: lang });
     const activeMeetingId = sessionService.getCurrentActiveMeetingSessionId();
     if (activeMeetingId) sessionService.updateCurrentMeetingSessionData(activeMeetingId, { sourceLang: lang.code });
   };
 
   const handleTargetLangChange = (lang: LanguageOption) => {
     if (isRecordingInProgress) { showToast("Không thể đổi ngôn ngữ khi đang ghi âm.", "error"); return; }
-    onSettingsChange({ targetLanguage: lang }); // This will update appSettings prop, then targetLanguage state via useEffect
+    onSettingsChange({ targetLanguage: lang });
     const activeMeetingId = sessionService.getCurrentActiveMeetingSessionId();
     if (activeMeetingId) sessionService.updateCurrentMeetingSessionData(activeMeetingId, { targetLang: lang.code });
   };
@@ -673,13 +729,6 @@ export const MainPage: React.FC<MainPageProps> = ({
     : !currentActiveTranscript ? (
       <p className="text-slate-400 italic text-center">Chưa có nội dung dịch.</p>
     ) : null;
-
-  const formatTime = (seconds: number): string => {
-    const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
-    const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
-    const s = (seconds % 60).toString().padStart(2, '0');
-    return `${h}:${m}:${s}`;
-  };
 
   const ttsPrimaryTextAvailable = sourceLanguage.code === targetLanguage.code ? currentActiveTranscript.trim() : fullTranslatedTranscript.trim();
   const theme = appSettings.theme;
@@ -734,6 +783,10 @@ export const MainPage: React.FC<MainPageProps> = ({
     </div>
   ) : null;
 
+  const progressBarColor = usagePercentage > 90 ? 'bg-red-500' : usagePercentage > 70 ? 'bg-yellow-500' : 'bg-green-500';
+  const progressBgColor = theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200';
+  const statusTextColor = theme === 'dark' ? 'text-slate-300' : 'text-slate-700';
+
 
   return (
     <div className={`min-h-screen flex flex-col items-center p-2 sm:p-4 md:p-6 ${theme === 'dark' ? 'bg-slate-900 text-slate-100' : 'bg-sky-50 text-slate-900'}`}>
@@ -762,7 +815,7 @@ export const MainPage: React.FC<MainPageProps> = ({
         </div>
         <div className="flex items-center space-x-2 sm:space-x-3">
           <div className={`text-xl sm:text-2xl font-mono tracking-wider px-2 sm:px-3 py-1 rounded ${theme === 'dark' ? 'bg-slate-700 text-slate-200' : 'bg-slate-100 text-slate-700'}`}>
-            {formatTime(elapsedTime)}
+            {formatDuration(elapsedTime)}
             {currentRecordingState === RecordingState.Recording && <RecordingStatusIcon className="w-3 h-3 inline-block ml-1.5 text-red-500 animate-pulse" />}
           </div>
           {(() => {
@@ -783,15 +836,43 @@ export const MainPage: React.FC<MainPageProps> = ({
           </button>
         </div>
       </div>
-       <div className={`w-full max-w-screen-xl mb-4 md:mb-6`}>
-         <MicrophoneVolumeIndicator
-              volumeLevel={micVolumeLevelRef.current}
-              isActive={currentRecordingState === RecordingState.Recording}
-              isMuted={isMicMuted}
-              clarityHint={micClarityHintRef.current}
-              theme={theme}
-          />
-        </div>
+      
+      {userData.id && planDetails && (
+          <div className={`w-full max-w-screen-xl p-3 sm:p-4 mb-4 md:mb-6 rounded-xl shadow-xl ${cardBg}`}>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-x-6 gap-y-4 items-center">
+                <div className="md:col-span-3">
+                    <div className={`flex justify-between items-center mb-1 text-xs sm:text-sm font-medium ${statusTextColor}`}>
+                        <span>Thời gian sử dụng tháng này</span>
+                        <span className={`font-semibold ${theme === 'dark' ? 'text-sky-400' : 'text-sky-600'}`}>{planDetails.name}</span>
+                    </div>
+                    <div className={`w-full h-2.5 rounded-full ${progressBgColor}`}>
+                        <div 
+                            className={`h-2.5 rounded-full ${progressBarColor} transition-all duration-300 ease-in-out`}
+                            style={{ width: `${usagePercentage}%` }}
+                            role="progressbar"
+                            aria-valuenow={usagePercentage}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                        ></div>
+                    </div>
+                    <div className={`flex justify-between items-center mt-1.5 text-xs ${statusTextColor}`}>
+                        <span className="font-mono" title="Đã dùng / Giới hạn">{formatDuration(usedSeconds)} / {formatDuration(usageLimitSeconds)}</span>
+                        <span className="font-mono" title="Thời gian còn lại">Còn lại: {formatDuration(Math.max(0, usageLimitSeconds - usedSeconds))}</span>
+                    </div>
+                </div>
+                <div className="md:col-span-2">
+                    <MicrophoneVolumeIndicator
+                        volumeLevel={micVolumeLevelRef.current}
+                        isActive={currentRecordingState === RecordingState.Recording}
+                        isMuted={isMicMuted}
+                        clarityHint={micClarityHintRef.current}
+                        theme={theme}
+                    />
+                </div>
+            </div>
+          </div>
+        )}
+
 
       <main className="w-full max-w-screen-xl grid grid-cols-1 md:grid-cols-5 gap-4 md:gap-6">
         <section className="md:col-span-3 space-y-4 md:space-y-6 flex flex-col">
