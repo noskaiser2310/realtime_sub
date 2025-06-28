@@ -1,83 +1,41 @@
-// src/services/googleSheetsService.ts
 
-/**
- * LƯU Ý VỀ SỬA LỖI:
- * -------------------
- * Lỗi "Multiple exports with the same name" và "The symbol has already been declared"
- * xảy ra khi một hằng số hoặc hàm được định nghĩa và export nhiều hơn một lần trong cùng một file.
- * Điều này thường xảy ra khi sao chép và dán code mới vào một file cũ mà không xóa code cũ đi.
- * * Phiên bản này là phiên bản cuối cùng, đã được làm sạch và chỉ chứa một định nghĩa duy nhất
- * cho mỗi hàm, đảm bảo không còn lỗi trùng lặp.
- *
- * KIẾN TRÚC TỔNG QUAN:
- * ---------------------
- * Dịch vụ này hoạt động theo mô hình phân tách trách nhiệm để bảo mật và đáng tin cậy tối đa:
- *
- * 1. Thao tác GHI (Theo dõi sự kiện):
- * - Tất cả các thao tác ghi (đăng ký, đăng nhập) đều được gửi dưới dạng yêu cầu POST tới một Ứng dụng Web Google Apps Script.
- * - URL của Ứng dụng Web được cung cấp qua `window.__sheets_config.webAppUrl`.
- * - Apps Script hoạt động như một proxy phía máy chủ an toàn, tự xác thực với Google và ghi dữ liệu.
- *
- * 2. Thao tác ĐỌC (Lấy thống kê):
- * - Các thao tác đọc (`getGlobalStats`) vẫn có thể sử dụng Google Sheets API v4 tiêu chuẩn với API Key chỉ đọc.
- * - Điều này yêu cầu Bảng tính Google phải được cài đặt chia sẻ là "Bất kỳ ai có đường liên kết đều có thể xem".
- * - API Key được cung cấp qua `window.__sheets_config.apiKey`.
- */
+
+
+
+import type { PlanTierId } from '../types';
 
 interface SheetsConfig {
   spreadsheetId: string;
-  apiKey: string; // Dành cho thao tác CHỈ ĐỌC
-  webAppUrl: string; // Dành cho thao tác GHI thông qua Google Apps Script
+  apiKey: string;
+  webAppUrl: string;
 }
 
 let SPREADSHEET_ID: string | null = null;
 let API_KEY: string | null = null;
 let WEB_APP_URL: string | null = null;
 
-/**
- * Tải cấu hình từ đối tượng window toàn cục.
- * Hàm này nên được gọi một lần khi module được khởi tạo.
- */
 const loadSheetsConfig = () => {
   if (typeof window !== 'undefined' && (window as any).__sheets_config) {
     const config = (window as any).__sheets_config as SheetsConfig;
     SPREADSHEET_ID = config.spreadsheetId;
     API_KEY = config.apiKey;
     WEB_APP_URL = config.webAppUrl;
-    
-    console.log("Google Sheets Service Config Loaded:", {
-      SPREADSHEET_ID,
-      API_KEY: API_KEY && !API_KEY.includes('YOUR') ? 'Loaded' : 'NOT SET',
-      WEB_APP_URL: WEB_APP_URL && !WEB_APP_URL.includes('YOUR') ? 'Loaded' : 'NOT SET',
-    });
-  } else {
-    console.warn("Google Sheets config object `__sheets_config` not found on window.");
   }
 };
-// Khởi tạo cấu hình ngay khi module được tải.
 loadSheetsConfig();
 
-/**
- * Gửi dữ liệu sự kiện một cách an toàn đến điểm cuối của Google Apps Script.
- * @param eventType Loại sự kiện ('register' hoặc 'login').
- * @param payload Dữ liệu liên quan đến sự kiện.
- * @returns Một boolean cho biết yêu cầu đã được gửi đi thành công hay chưa.
- */
-const postToAppsScript = async (eventType: 'register' | 'login', payload: object): Promise<boolean> => {
+// Hàm gửi dữ liệu đến Google Apps Script
+const postToAppsScript = async (eventType: 'register' | 'login' | 'updateUsage', payload: object): Promise<boolean> => {
   if (!WEB_APP_URL || WEB_APP_URL.includes("YOUR_WEB_APP_URL")) {
-    console.warn('Google Apps Script Web App URL is not configured. Skipping event tracking.');
+    console.warn('Google Apps Script Web App URL is not configured.');
     return false;
   }
 
   try {
-    // Sử dụng `fetch` để gửi yêu cầu POST. Apps Script được thiết kế để xử lý việc này.
     await fetch(WEB_APP_URL, {
       method: 'POST',
-      // 'no-cors' là một giải pháp khi gọi Apps Script từ một tên miền khác trong trình duyệt.
-      // Nó có nghĩa là chúng ta không thể đọc nội dung phản hồi, nhưng yêu cầu vẫn được gửi đi.
       mode: 'no-cors',
       headers: {
-        // Apps Script xử lý postData dạng text/plain tốt hơn.
         'Content-Type': 'text/plain;charset=utf-8',
       },
       body: JSON.stringify({
@@ -86,34 +44,47 @@ const postToAppsScript = async (eventType: 'register' | 'login', payload: object
       }),
     });
     
-    console.log(`Event tracking request for '${eventType}' was successfully sent to the gateway.`);
     return true;
 
   } catch (error) {
-    console.error(`Network error when sending '${eventType}' event to gateway:`, error);
+    console.error(`Network error when sending event:`, error);
     return false;
   }
 };
 
-// --- Các hàm theo dõi công khai ---
-
-/**
- * Theo dõi một lượt đăng ký người dùng mới bằng cách gửi dữ liệu đến điểm cuối Apps Script an toàn.
- */
-export const trackUserRegistration = async (userId: string, username:string, installId: string): Promise<boolean> => {
+// Cập nhật hàm trackUserRegistration với 2 trường mới
+export const trackUserRegistration = async (
+  userId: string, 
+  username: string, 
+  installId: string,
+  plan: PlanTierId = 'guest',
+  timeUseSeconds: number = 0
+): Promise<boolean> => {
   const payload = {
     userId,
     username,
     installId,
     timestamp: new Date().toISOString(),
     userAgent: navigator.userAgent.substring(0, 250),
+    plan,              // Trường mới
+    timeUseSeconds     // Trường mới
   };
   return postToAppsScript('register', payload);
 };
 
-/**
- * Theo dõi một sự kiện đăng nhập của người dùng bằng cách gửi dữ liệu đến điểm cuối Apps Script an toàn.
- */
+// Hàm mới: cập nhật thời gian sử dụng
+export const trackUsageUpdate = async (
+  userId: string, 
+  timeUseSeconds: number
+): Promise<boolean> => {
+  const payload = {
+    userId,
+    timeUseSeconds
+  };
+  return postToAppsScript('updateUsage', payload);
+};
+
+// Hàm login giữ nguyên
 export const trackUserLogin = async (userId: string, username: string): Promise<boolean> => {
   const payload = {
     userId,

@@ -4,7 +4,7 @@ import bcrypt from 'https://esm.sh/bcryptjs@^2.4.3';
 import { track } from '@vercel/analytics';
 import type { SummaryContent, PlanTierId } from '../types';
 import { INITIAL_SUMMARY_CONTENT, getUsageLimitSecondsByPlan, DEFAULT_PLAN_ID } from '../constants';
-import { trackUserRegistration as trackUserRegistrationGlobally, trackUserLogin as trackUserLoginGlobally, getGlobalStats } from './googleSheetsService';
+import { trackUserRegistration as trackUserRegistrationGlobally, trackUserLogin as trackUserLoginGlobally, getGlobalStats, trackUsageUpdate } from './googleSheetsService';
 
 
 // Storage Keys
@@ -201,16 +201,30 @@ export const registerUser = async (userName: string, passwordPlain: string): Pro
   // Gửi thông tin đăng ký tới dịch vụ toàn cầu.
   // Không cần `await` ở đây để tránh block trải nghiệm người dùng.
   // Việc tracking có thể chạy ngầm.
-  trackUserRegistrationGlobally(newUser.userId, userName, installId)
-    .then(success => {
+  // trackUserRegistrationGlobally(newUser.userId, userName, installId)
+  //   .then(success => {
+  //     if (success) {
+  //       console.log(`User '${userName}' registration tracking request sent successfully.`);
+  //     } else {
+  //       console.error(`Failed to send registration tracking request for user '${userName}'.`);
+  //     }
+  //   });
+  
+  // console.log(`User '${userName}' registered successfully locally.`);
+  // return newUser;
+  trackUserRegistrationGlobally(
+    newUser.userId, 
+    userName, 
+    installId,
+    newUser.planType || 'guest',          // Thêm plan
+    (newUser.totalAudioUsedMs || 0) / 1000 // Chuyển ms → seconds
+  )
+    .then((success: boolean) => {
       if (success) {
-        console.log(`User '${userName}' registration tracking request sent successfully.`);
-      } else {
-        console.error(`Failed to send registration tracking request for user '${userName}'.`);
+        console.log(`User '${userName}' registration tracking sent.`);
       }
     });
   
-  console.log(`User '${userName}' registered successfully locally.`);
   return newUser;
 };
 
@@ -239,7 +253,7 @@ export const loginUser = async (userName:string, passwordPlain: string): Promise
 
             // Gửi thông tin đăng nhập tới dịch vụ toàn cầu
             trackUserLoginGlobally(user.userId, userName)
-                .then(success => {
+                .then((success: boolean) => {
                     if (success) {
                         console.log(`User '${userName}' login tracking request sent successfully.`);
                     } else {
@@ -355,8 +369,14 @@ export const recordAudioUsage = (userId: string, durationSeconds: number) => {
     saveUsersToDB(users);
     
     window.dispatchEvent(new CustomEvent('updateUsage'));
-};
-
+    const totalSeconds = Math.floor((user.totalAudioUsedMs || 0) / 1000);
+    trackUsageUpdate(userId, totalSeconds)
+      .then((success: boolean) => {
+        if (success) {
+          console.log(`Usage updated for user ${userId}: ${totalSeconds} seconds`);
+        }
+      });
+    };
 
 export const updateUserPlan = async (userId: string, planId: PlanTierId): Promise<boolean> => {
     const users = getUsersFromDB();
